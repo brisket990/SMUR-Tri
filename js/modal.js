@@ -31,10 +31,23 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
 
   // ---------- boutons de gestes (générés depuis la config) ----------
   const posBox = $('pos-buttons');
+  // pictogrammes des positions d'attente (vue de profil, sol en bas)
+  const L = (d) => `<path d="${d}" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const H = (x, y) => `<circle cx="${x}" cy="${y}" r="2.9" fill="currentColor"/>`;
+  const G = '<line x1="1" y1="19" x2="43" y2="19" stroke="currentColor" stroke-width="1" opacity=".35"/>';
+  const POS_ICON = {
+    pls: G + H(6, 12.5) + L('M9 14 L24 15') + L('M24 15 L31 9.5 L36 15') + L('M24 16 L39 17.5') + L('M10 16.5 L16 18'),
+    posSit: G + '<line x1="5" y1="19" x2="15" y2="4" stroke="currentColor" stroke-width="1" opacity=".45"/>' + H(12.5, 4.5) + L('M14.5 8 L21 16.5') + L('M21 16.5 L39 17') + L('M16 10.5 L22 13'),
+    posLegs: G + '<rect x="30" y="10" width="11" height="9" rx="1" fill="currentColor" opacity=".25"/>' + H(5, 15.5) + L('M8 16.5 L22 16.5') + L('M22 16.5 L39 8.5'),
+    posFlexed: G + H(5, 15.5) + L('M8 16.5 L23 16.5') + L('M23 16.5 L30 8 L37 17.5'),
+    posFlat: G + H(5, 15.5) + L('M8 16.5 L24 16.5') + L('M24 16.5 L40 16.5'),
+  };
   const careButtons = Object.entries(CONFIG.items).map(([key, item]) => {
     const b = document.createElement('button');
     b.dataset.care = key;
-    b.innerHTML = `<span>${item.label}</span><span class="qty"></span>`;
+    b.innerHTML = POS_ICON[key]
+      ? `<svg class="pos-ico" viewBox="0 0 44 21" aria-hidden="true">${POS_ICON[key]}</svg><span class="pos-label">${item.label}</span><span class="qty"></span>`
+      : `<span>${item.label}</span><span class="qty"></span>`;
     if (item.group === 'position') b.classList.add('pos-btn');
     b.addEventListener('click', () => {
       if (!current) return;
@@ -48,7 +61,7 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
 
   // ---------- vue de face / de dos (fiches générées) ----------
   const viewBtn = $('card-view-btn');
-  const viewLabel = (v) => (v.cardView === 'dos' ? '↻ Voir de face' : '↻ Retourner : voir le dos');
+  const viewLabel = (v) => (v.cardView === 'dos' ? '↻ Voir de face' : '↻ Voir le dos');
   viewBtn.addEventListener('click', async (e) => {
     e.stopPropagation();
     if (!current || !onView) return;
@@ -69,6 +82,7 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
   const evacWalk = $('evac-walk');
   const evacStretch = $('evac-stretcher');
   const evacCancel = $('evac-cancel');
+  const evacPrio = $('evac-priority');
   const evacAction = (mode) => () => {
     if (!current || !onEvac) return;
     const res = onEvac(current.id, mode);
@@ -79,6 +93,7 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
   evacWalk.addEventListener('click', evacAction('walk'));
   evacStretch.addEventListener('click', evacAction('stretcher'));
   evacCancel.addEventListener('click', evacAction('cancel'));
+  evacPrio.addEventListener('click', evacAction('priority'));
 
   // ---------- secouriste ----------
   const rescStatus = $('resc-status');
@@ -119,6 +134,12 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
       b.title = untriaged ? 'Triez la victime d\'abord' : '';
     }
     evacCancel.hidden = st !== 'queued';
+    // priorité : possible si la victime est triée et pas encore prise en charge
+    const prio = !!v.evac?.priority;
+    evacPrio.hidden = !['none', 'queued'].includes(st) || v.status === 'DEAD';
+    evacPrio.disabled = untriaged || prio;
+    evacPrio.textContent = prio ? '⚡ Prioritaire (demandé)' : '⚡ Brancardage prioritaire';
+    evacPrio.classList.toggle('on', prio);
   }
 
   function showToast(res, key) {

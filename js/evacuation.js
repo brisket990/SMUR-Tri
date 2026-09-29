@@ -101,6 +101,83 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     return { ok: true, message: `Brancardage demandé (${queue.length}ᵉ en attente).` };
   }
 
+  // ---------- priorités ----------
+  //  Une priorité passe devant la file. On ne peut avoir en attente qu'autant de priorités
+  //  que d'équipes sur place : au-delà, la plus ancienne (pas encore prise en charge) redevient normale.
+  //  S'il n'y a pas d'équipe libre, l'équipe la plus proche encore EN ROUTE vers une victime
+  //  non prioritaire lâche sa mission (cette victime retourne dans la file) et part vers la priorité.
+  const byOrder = (a, b) => (a.evac.priority ? 0 : 1) - (b.evac.priority ? 0 : 1)
+    || (a.evac.priority ?? a.evac.requestedAt) - (b.evac.priority ?? b.evac.requestedAt);
+  function nextInQueue() {
+    const waiting = queue.filter((v) => v.evac?.state === 'queued').sort(byOrder);
+    const v = waiting[0];
+    if (v) queue.splice(queue.indexOf(v), 1);
+    return v ?? null;
+  }
+  const activeTeams = () => teams.filter((tm) => now() >= tm.arriveAt);
+
+  function startJob(tm, v, fx = pma.x, fy = pma.y) {
+    const t = now();
+    const f = 1 + fatigueOf(tm);   // équipe fatiguée : tout prend plus de temps
+    const toVictim = travelMs(fx, fy, v.x, v.y, speed.empty) * f;
+    const back = travelMs(v.x, v.y, pma.x, pma.y, speed.stretcher) * f;
+    const load = loadMs * f, unload = unloadMs * f;
+    tm.job = { v, fatigue: f - 1, t0: t, fx, fy, at: t + toVictim, loaded: t + toVictim + load, atPMA: t + toVictim + load + back, free: t + toVictim + load + back + unload, vx: v.x, vy: v.y };
+    v.evac.fatigue = f - 1;
+    Object.assign(v.evac, { state: 'pickup', team: tm.id, org: tm.org, startAt: t, pickupAt: tm.job.at });
+    logEvent(state, 'evac-team', { id: v.id, team: tm.id, fatigue: f - 1, trip: tm.trips + 1, priority: !!v.evac.priority });
+  }
+
+  function prioritize(v) {
+    const e = ensure(v);
+    if (e.state === 'none') {
+      const r = requestStretcher(v);
+      if (!r.ok) return r;
+    }
+    if (e.state !== 'queued') return { ok: false, message: e.priority ? 'Déjà prioritaire et prise en charge.' : 'Brancardage déjà en cours.' };
+    if (e.priority) return { ok: false, message: 'Déjà prioritaire.' };
+    e.priority = now();
+    logEvent(state, 'evac-priority', { id: v.id });
+    let msg = 'Brancardage PRIORITAIRE demandé.';
+    // limite : une priorité « pas encore commencée » par équipe sur place
+    //  (pas commencée = encore dans la file, ou équipe en route sans avoir chargé la victime)
+    const t = now();
+    const teamOf = (x) => teams.find((tm) => tm.job?.v === x);
+    const notStarted = () => state.victims.filter((x) => x.evac?.priority && (x.evac.state === 'queued'
+      || (x.evac.state === 'pickup' && t < (teamOf(x)?.job.at ?? 0)))).sort((a, b) => a.evac.priority - b.evac.priority);
+    const limit = Math.max(1, activeTeams().length);
+    const divert = (tm, why) => {                    // l'équipe lâche sa mission et part vers la nouvelle priorité
+      const dropped = tm.job.v;
+      Object.assign(dropped.evac, { state: 'queued', team: null, org: null, pickupAt: null });
+      queue.push(dropped);
+      logEvent(state, 'evac-diverted', { id: dropped.id, team: tm.id, to: v.id });
+      const fx = tm.x, fy = tm.y;
+      tm.job = null;
+      queue.splice(queue.indexOf(v), 1);
+      startJob(tm, v, fx, fy);
+      msg += ` ${tm.id} abandonne ${dropped.id}${why} et part vers ${v.id}.`;
+    };
+    let done = false;
+    let list = notStarted();
+    while (list.length > limit) {
+      const lost = list.find((x) => x !== v);
+      lost.evac.priority = null;
+      logEvent(state, 'evac-priority-lost', { id: lost.id, by: v.id });
+      msg += ` ${lost.id} perd sa priorité (une seule priorité par équipe).`;
+      const tm = lost.evac.state === 'pickup' ? teamOf(lost) : null;
+      if (tm && !done && v.evac.state === 'queued') { divert(tm, ' (remise dans la file)'); done = true; }
+      list = notStarted();
+    }
+    // pas d'équipe libre : on détourne l'équipe la plus proche encore en route vers une victime non prioritaire
+    if (!done && v.evac.state === 'queued' && !activeTeams().some((tm) => !tm.job)) {
+      const cand = activeTeams().filter((tm) => tm.job && t < tm.job.at && !tm.job.v.evac.priority)
+        .sort((a, b) => Math.hypot(a.x - v.x, a.y - v.y) - Math.hypot(b.x - v.x, b.y - v.y))[0];
+      if (cand) divert(cand, ' (remise dans la file)');
+      else if (activeTeams().length) msg += ' Aucune équipe ne peut être détournée : première équipe libérée.';
+    }
+    return { ok: true, message: msg };
+  }
+
   function cancel(v) {
     const i = queue.indexOf(v);
     if (i < 0) return { ok: false, message: 'Aucune demande en attente.' };
@@ -150,24 +227,16 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
       }
       const j = tm.job;
       if (!j) {
-        // première victime de la file encore concernée
-        while (queue.length && queue[0].evac?.state !== 'queued') queue.shift();
-        const v = queue.shift();
+        // priorités d'abord, puis ordre des demandes
+        const v = nextInQueue();
         if (!v) continue;
-        const f = 1 + fatigueOf(tm);   // équipe fatiguée : tout prend plus de temps
-        const toVictim = travelMs(pma.x, pma.y, v.x, v.y, speed.empty) * f;
-        const back = travelMs(v.x, v.y, pma.x, pma.y, speed.stretcher) * f;
-        const load = loadMs * f, unload = unloadMs * f;
-        tm.job = { v, fatigue: f - 1, t0: t, at: t + toVictim, loaded: t + toVictim + load, atPMA: t + toVictim + load + back, free: t + toVictim + load + back + unload, vx: v.x, vy: v.y };
-        v.evac.fatigue = f - 1;
-        Object.assign(v.evac, { state: 'pickup', team: tm.id, org: tm.org, startAt: t, pickupAt: tm.job.at });
-        logEvent(state, 'evac-team', { id: v.id, team: tm.id, fatigue: f - 1, trip: tm.trips + 1 });
+        startJob(tm, v);
         continue;
       }
       const v = j.v;
       if (t < j.at) {                                    // en route vers la victime
         const k = (t - j.t0) / (j.at - j.t0);
-        tm.x = pma.x + (j.vx - pma.x) * k; tm.y = pma.y + (j.vy - pma.y) * k;
+        tm.x = j.fx + (j.vx - j.fx) * k; tm.y = j.fy + (j.vy - j.fy) * k;
       } else if (t < j.loaded) {                         // conditionnement
         tm.x = j.vx; tm.y = j.vy;
         v.evac.state = 'loading';
@@ -211,11 +280,12 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     const fmt = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
     switch (e?.state) {
       case 'queued': {
-        const pos = queue.indexOf(v) + 1;
+        const pos = queue.filter((x) => x.evac?.state === 'queued').sort(byOrder).indexOf(v) + 1;
+        if (e.priority) return `⚡ PRIORITAIRE — ${pos === 1 ? 'prochaine équipe libre' : `${pos}ᵉ dans la file`}`;
         const s = summary();
         return `En attente de brancardage (${pos}ᵉ dans la file)${s.free + s.busy === 0 && s.next ? ` · premières équipes (${s.next.org}) dans ${fmt(s.next.inMs)}` : ''}`;
       }
-      case 'pickup': return `${e.team} (${e.org}) en route vers la victime${fat(e)}`;
+      case 'pickup': return `${e.priority ? '⚡ ' : ''}${e.team} (${e.org}) en route vers la victime${fat(e)}`;
       case 'loading': return `${e.team} : conditionnement sur brancard${fat(e)}`;
       case 'transport': return `${e.team} : transport vers le PMA${fat(e)}`;
       case 'walking': return 'Rejoint le PMA à pied';
@@ -252,7 +322,7 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
       ctx.save();
       ctx.font = '16px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('⏳', x + v.w * camera.zoom * 0.5 + 6, y - v.h * camera.zoom * 0.35);
+      ctx.fillText(v.evac.priority ? '⚡⏳' : '⏳', x + v.w * camera.zoom * 0.5 + 6, y - v.h * camera.zoom * 0.35);
       ctx.restore();
     }
 
@@ -283,7 +353,7 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     }
   }
 
-  return { walk, requestStretcher, cancel, update, summary, statusText, draw, pma };
+  return { walk, requestStretcher, prioritize, cancel, update, summary, statusText, draw, pma };
 }
 
 function roundRect(ctx, x, y, w, h, r) {

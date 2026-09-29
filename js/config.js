@@ -87,6 +87,7 @@ export const CONFIG = {
     keysSrc: 'data/keys.json',        // clé des fichiers, protégée par chaque code
     threatSrc: 'images/menace.png',   // image facultative ; sinon une carte "menace" est dessinée
     revealClicks: 3,                  // clics rapides sur la carte du menu pour faire apparaître le champ code
+    decoys: [2, 3],                   // sans code : nombre de fiches leurres jouables (tiré entre les deux) avant la menace
   },
 
 

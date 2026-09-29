@@ -19,12 +19,13 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 #board.hovering { cursor: pointer; }
 
 /* ---------- HUD ---------- */
-#hud { position: fixed; top: 12px; right: 12px; width: 270px; background: var(--panel);
-  border: 1px solid var(--line); border-radius: 10px; padding: 12px; user-select: none; }
+#hud { position: fixed; top: 12px; right: 12px; display: flex; gap: 10px; align-items: flex-start; user-select: none; }
+.hud-col { width: 262px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+  max-height: calc(100vh - 24px); overflow-y: auto; }
 .hud-block + .hud-block { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
 .hud-block h2 { margin: 0 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .clock { font: 600 30px/1 ui-monospace, "SF Mono", Consolas, monospace; }
-#hud-clock, #hud-reinf, #hud > .hud-block:first-child h2 { margin-left: 22px; }
+#hud-clock, #hud-reinf, #hud-col-a > .hud-block:first-child h2 { margin-left: 22px; }
 #hud ul { list-style: none; margin: 0; padding: 0; font-size: 14px; }
 #hud li { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
 #hud li .empty { color: var(--red); font-weight: 600; }
@@ -86,15 +87,17 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 .evo-popup button { margin-top: 12px; width: 100%; background: var(--red); color: #fff; border: 0; font-weight: 600; }
 
 /* Panneau des gestes */
-.care-panel { width: 270px; flex: none; border-left: 1px solid var(--line); padding: 12px; overflow-y: auto; }
+.care-panel { flex: none; display: flex; border-left: 1px solid var(--line); min-height: 0; }
+.care-col { width: 250px; padding: 12px; overflow-y: auto; min-height: 0; }
+.care-col + .care-col { border-left: 1px solid var(--line); }
 .care-panel h3 { margin: 14px 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.care-panel h3:first-child { margin-top: 0; }
+.care-panel h3:first-child, .care-col > h3:first-child { margin-top: 0; }
 .care-buttons { display: grid; gap: 6px; }
 .care-buttons button { display: flex; justify-content: space-between; align-items: center; text-align: left; }
 .care-buttons button .qty { font: 600 13px ui-monospace, monospace; color: var(--muted); }
 .care-buttons button .qty.empty { color: var(--red); }
-.pos-buttons { grid-template-columns: 1fr 1fr; gap: 5px; }
-.pos-buttons button { font-size: 12.5px; padding: 6px 8px; }
+.pos-buttons { grid-template-columns: 1fr; gap: 6px; }
+.pos-buttons button { font-size: 14px; padding: 5px 10px; justify-content: flex-start; gap: 10px; }
 .pos-buttons button.on { outline: 2px solid #64b5f6; opacity: 1; }
 .pos-buttons button .qty { color: #64b5f6; }
 .care-toast { min-height: 1.4em; margin-top: 8px; font-size: 13px; color: #e8e0c8; }
@@ -108,7 +111,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); c
 
 @media (max-width: 760px) {
   .modal-main { flex-direction: column; }
-  .care-panel { width: auto; border-left: 0; border-top: 1px solid var(--line); max-height: 38%; }
+  .care-panel { width: auto; border-left: 0; border-top: 1px solid var(--line); max-height: 42%; }
+  .care-col { width: 50%; }
 }
 
 /* Bilan */
@@ -302,7 +306,6 @@ kbd { display: inline-block; min-width: 1.4em; padding: 0 5px; border: 1px solid
 .evac-buttons [hidden] { display: none; }
 
 #hud .pma-line b { color: #a5d6a7; }
-#hud { max-height: calc(100vh - 24px); overflow-y: auto; }
 
 .lg-team { flex: none; width: 30px; height: 30px; border-radius: 50%; background: #0b3d91; border: 2px solid #fff; color: #fff;
   font: 800 7px/26px system-ui, sans-serif; text-align: center; box-shadow: 0 0 0 5px rgba(120, 200, 255, .15), 0 0 0 6px rgba(120, 200, 255, .6); }
@@ -429,7 +432,36 @@ table.hist code { font-family: ui-monospace, monospace; }
 #hud-inventory li.up b::before { content: '▲ '; font-size: 10px; }
 
 /* fiche : bouton face / dos, sur le cadre silhouette */
-.card-view-btn { position: absolute; left: 7%; top: 67.4%; z-index: 2; font: 700 12px system-ui, sans-serif; padding: 4px 10px;
+.card-view-btn { position: absolute; left: 7%; top: 67.4%; z-index: 2; font: 700 11.5px system-ui, sans-serif; padding: 3px 9px; max-width: 33%; white-space: nowrap;
   background: rgba(27, 42, 58, .88); color: #fff; border: 0; border-radius: 12px; cursor: pointer; }
 .card-view-btn:hover { background: #1b2a3a; }
 .card-view-btn[hidden] { display: none; }
+
+/* ---------- indicateur « il y a une suite en dessous » ---------- */
+.scroll-hint { position: relative; }
+.scroll-more { position: sticky; bottom: -12px; margin: 6px -12px -12px; height: 44px; display: flex; align-items: flex-end; justify-content: center;
+  padding-bottom: 6px; background: linear-gradient(to bottom, rgba(21,24,31,0), var(--panel) 70%); pointer-events: none; }
+.scroll-more span { pointer-events: auto; cursor: pointer; font: 700 12px system-ui, sans-serif; color: #111; background: #ffd54f;
+  border-radius: 12px; padding: 3px 10px; box-shadow: 0 2px 8px rgba(0,0,0,.4); animation: moreBob 1.4s ease-in-out infinite; }
+.scroll-more[hidden] { display: none; }
+@keyframes moreBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(3px); } }
+/* fiche : boutons un peu plus compacts pour tenir sans défiler */
+.care-col .care-buttons button { padding: 7px 10px; font-size: 14px; }
+.care-col .evac-buttons button { padding: 7px 10px; font-size: 14px; }
+@media (max-width: 1100px) { .hud-col { width: 228px; } }
+
+/* écrans pleins (menu, briefing) : défilables si la fenêtre est basse, centrés sinon */
+.menu, .briefing { overflow-y: auto; align-items: flex-start; }
+.menu > .menu-card, .briefing > * { margin-top: auto; margin-bottom: auto; }
+
+.clock-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-left: 22px; }
+.clock-row #hud-clock { margin-left: 0; }
+.hud-btn.hud-btn-top { width: auto; margin: 0; padding: 5px 12px; font-size: 13px; }
+
+.prio-btn { background: #3a2a05; border: 1px solid #a07a12; color: #ffd54f; font-weight: 700; }
+.prio-btn:hover:not(:disabled) { background: #4a360a; }
+.prio-btn.on { background: #ffd54f; color: #111; opacity: 1; }
+
+.pos-ico { width: 52px; height: 25px; flex: none; color: #b8c7d8; }
+.pos-buttons button.on .pos-ico { color: #64b5f6; }
+.pos-label { flex: 1; text-align: left; line-height: 1.2; }

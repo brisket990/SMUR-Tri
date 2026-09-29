@@ -169,6 +169,9 @@ export function analyzeVictim(v, state) {
       if (l.type === 'evac' && l.mode === 'walk') did.push({ t: l.t, text: (l.ok ? 'Orientée à pied vers le PMA' : 'Envoi à pied tenté') + (l.by ? ` par ${l.by}` : ''), note: l.by ? 'renfort' : l.ok ? '' : 'ne pouvait pas marcher', cls: l.ok || l.by ? '' : 'k-useless' });
       if (l.type === 'evac' && l.mode === 'stretcher') did.push({ t: l.t, text: `Brancardage demandé${l.by ? ` par ${l.by}` : ''}`, note: l.by ? 'renfort' : '' });
       if (l.type === 'evac-cancel') did.push({ t: l.t, text: 'Demande de brancardage annulée' });
+      if (l.type === 'evac-priority') did.push({ t: l.t, text: '⚡ Brancardage passé en priorité' });
+      if (l.type === 'evac-priority-lost') did.push({ t: l.t, text: `Priorité perdue au profit de ${l.by}`, note: 'une priorité par équipe', cls: 'k-excessive' });
+      if (l.type === 'evac-diverted') did.push({ t: l.t, text: `${l.team} détournée vers la priorité ${l.to}`, note: 'remise dans la file', cls: 'k-excessive' });
       if (l.type === 'evac-team') did.push({ t: l.t, text: `Brancardage pris en charge par ${l.team}`, note: l.fatigue > 0.001 ? `${l.trip}ᵉ brancardage de l'équipe, fatigue +${Math.round(l.fatigue * 100)} %` : '' });
       if (l.type === 'pma') did.push({ t: l.t, text: 'Arrivée au PMA' });
       if (l.type === 'rescuer') did.push({ t: l.t, text: `${l.rescuer} posté auprès de la victime`, note: l.mode });

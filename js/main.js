@@ -29,6 +29,7 @@ import { createRescuers } from './rescuers.js';
 import { createSmurTeams } from './smurTeams.js';
 import { createPompiers } from './pompiers.js';
 import { createIntro } from './intro.js';
+import { setupScrollHints } from './scrollhint.js';
 import { drawZoneLight } from './orders.js';
 import { selectVictims } from './selection.js';
 import { scaledStock } from './stock.js';
@@ -37,7 +38,7 @@ import { generatedCardURL } from './cardgen.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const HUD_WIDTH = 294; // largeur du HUD + marge, laissée libre au recadrage
+const hudWidth = () => (document.getElementById('hud')?.offsetWidth ?? 540) + 24; // largeur du tableau de bord (2 colonnes), laissée libre au recadrage
 
 async function boot() {
   const setProgress = (done, total, label) => {
@@ -123,14 +124,8 @@ async function boot() {
   let missing = 0;
   let visuals;
   let cardOpts = null;       // fiches générées : options pour les redessiner (gestes, vue de dos)
-  if (!authorized) {
-    let threatSrc;
-    try { await loadImage(CONFIG.access.threatSrc); threatSrc = CONFIG.access.threatSrc; }
-    catch { threatSrc = threatCard().toDataURL('image/jpeg', 0.85); }
-    const thumb = backThumb ?? makeThumb(threatCard(), CONFIG.thumbWidth);
-    visuals = entries.map(() => ({ src: threatSrc, thumb }));
-  } else {
-    const mode = scenario.cards?.mode ?? CONFIG.cards?.mode ?? 'generated';
+  let leurres = [];
+  {
     // vos fiches vierges (images publiques, sans donnée clinique) : une par type de silhouette
     const asDataURL = async (url) => {
       const r = await fetch(url);
@@ -145,6 +140,17 @@ async function boot() {
       try { dosImages[n] = await asDataURL(`${tplDir}dos-${n}.png`); } catch { /* vue de dos : silhouette absente */ }
     }));
     cardOpts = { title: scenario.cards?.title ?? CONFIG.cards?.title, templates, dosImages, labels: CONFIG.items };
+  }
+  if (!authorized) {
+    // sans code : 2 ou 3 fiches LEURRES jouables (inventées, publiques), puis la menace
+    try { leurres = (await fetchJSON('data/leurres.json')).leurres ?? []; } catch { leurres = []; }
+    let threatSrc;
+    try { await loadImage(CONFIG.access.threatSrc); threatSrc = CONFIG.access.threatSrc; }
+    catch { threatSrc = threatCard().toDataURL('image/jpeg', 0.85); }
+    const thumb = backThumb ?? makeThumb(threatCard(), CONFIG.thumbWidth);
+    visuals = entries.map(() => ({ src: threatSrc, thumb }));
+  } else {
+    const mode = scenario.cards?.mode ?? CONFIG.cards?.mode ?? 'generated';
     const generate = async (e) => {
       const src = generatedCardURL(e, cardOpts);
       return { src, thumb: makeThumb(await loadImage(src), CONFIG.thumbWidth), generated: true };
@@ -209,7 +215,7 @@ async function boot() {
   const camera = new Camera();
   const renderer = createRenderer(canvas, camera, CONFIG);
   renderer.resize();
-  camera.fit(plan.w, plan.h, { rightReserve: HUD_WIDTH });
+  camera.fit(plan.w, plan.h, { rightReserve: hudWidth() });
 
   // Équipe SMUR (périmètre d'action) et évacuation vers le PMA
   const team = createTeam(state, scenario, plan);
@@ -236,6 +242,7 @@ async function boot() {
   });
 
   const hud = createHud();
+  const checkScroll = setupScrollHints();
   const debrief = createDebrief(state, { history });
   $('hud-debrief').addEventListener('click', () => debrief.open());
   const modal = createModal({
@@ -251,7 +258,7 @@ async function boot() {
     },
     onEvac: (id, mode) => {
       const v = state.byId.get(id);
-      const res = mode === 'walk' ? evac.walk(v) : mode === 'cancel' ? evac.cancel(v) : evac.requestStretcher(v);
+      const res = mode === 'walk' ? evac.walk(v) : mode === 'cancel' ? evac.cancel(v) : mode === 'priority' ? evac.prioritize(v) : evac.requestStretcher(v);
       hud.update(state);
       return res;
     },
@@ -263,8 +270,8 @@ async function boot() {
     },
     onClose: () => { if (CONFIG.clock.pauseOnModal) state.clock.running = true; },
     // Mode non autorisé : la carte retournée révèle une menace → mort
-    onRevealed: () => {
-      if (authorized) return true;
+    onRevealed: (v) => {
+      if (authorized || v?.decoy) return true;       // fiche leurre : jouable
       state.clock.running = false;
       state.over = true;
       setTimeout(() => { modal.close(); $('death').hidden = false; }, 900);
@@ -302,9 +309,23 @@ async function boot() {
     },
   });
 
+  const decoyMax = CONFIG.access.decoys?.[0] + Math.floor(rng.next() * ((CONFIG.access.decoys?.[1] ?? 3) - (CONFIG.access.decoys?.[0] ?? 2) + 1)) || 0;
+  let decoyUsed = 0;
+  function makeDecoy(v) {
+    const d = leurres[decoyUsed % leurres.length];
+    decoyUsed++;
+    v.decoy = true;
+    v.clinical = d.clinical;
+    v.truth = { triage: null, accept: [], limit: false, why: '', note: '', ...d.truth };
+    v.entry = { id: v.id, clinical: d.clinical, injuries: d.injuries };
+    initEvolution(v, { stages: [], actions: {}, ...d.profile });
+    v.cardView = 'face'; v.cardSig = '0||face';
+    v.src = generatedCardURL(v.entry, cardOpts);
+  }
   function examine(v) {
     team.stop();
-    const firstLook = (v.seenAt == null && !!v.back) || !authorized;
+    if (!authorized && v.seenAt == null && !v.decoy && decoyUsed < decoyMax && leurres.length && cardOpts) makeDecoy(v);
+    const firstLook = (v.seenAt == null && !!v.back) || (!authorized && !v.decoy) || (v.decoy && v.seenAt == null);
     markSeen(state, v.id);
     if (CONFIG.clock.pauseOnModal) state.clock.running = false;
     modal.open(v, firstLook ? cardBackSrc : null); // retournement au 1er examen
@@ -328,7 +349,7 @@ async function boot() {
     if (e.key === 'c' || e.key === 'C') { camera.x = team.team.x; camera.y = team.team.y; camera.clamp(); }
     // N : nouvelle partie avec une nouvelle disposition
     if (e.key === 'n' || e.key === 'N') newGame();
-    if (e.key === 'f' || e.key === 'F') camera.fit(plan.w, plan.h, { rightReserve: HUD_WIDTH });
+    if (e.key === 'f' || e.key === 'F') camera.fit(plan.w, plan.h, { rightReserve: hudWidth() });
     if (e.key === 'd' || e.key === 'D') {
       state.ui.debugZones = !state.ui.debugZones;
       $('debug-coords').hidden = !state.ui.debugZones;
@@ -385,7 +406,7 @@ async function boot() {
     amb.update(dt);
     outside?.update();
     renderer.render(state, planImage, mouse, now / 1000, dt / 1000);
-    if ((hudTimer += dt) > 200) { hud.update(state); modal.tick(); refreshCards(); checkEnd(); hudTimer = 0; }
+    if ((hudTimer += dt) > 200) { hud.update(state); modal.tick(); refreshCards(); checkEnd(); checkScroll(); hudTimer = 0; }
     requestAnimationFrame(frame);
   }
   // Fiches générées : la carte montre les gestes réalisés et la vue choisie (face / dos)

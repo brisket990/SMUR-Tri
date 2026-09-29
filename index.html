@@ -12,15 +12,8 @@
 
   <!-- HUD -->
   <aside id="hud">
-    <section class="hud-block">
-      <h2>Chrono</h2>
-      <div id="hud-clock" class="clock">00:00</div>
-      <div id="hud-reinf" class="muted"></div>
-    </section>
-    <section class="hud-block">
-      <h2>Sac médical</h2>
-      <ul id="hud-inventory"></ul>
-    </section>
+    <!-- colonne 1 (à côté de la salle) : équipes sur place et évacuation -->
+    <div id="hud-col-b" class="hud-col scroll-hint">
     <section id="hud-smur-block" class="hud-block" hidden>
       <h2>Équipes sur place</h2>
       <ul id="hud-smur" class="smur-list"></ul>
@@ -28,6 +21,18 @@
     <section class="hud-block">
       <h2>Évacuation</h2>
       <ul id="hud-evac"></ul>
+    </section>
+    </div>
+    <!-- colonne 2 (à droite) : chrono, sac, tri, bilan -->
+    <div id="hud-col-a" class="hud-col scroll-hint">
+    <section class="hud-block">
+      <h2>Chrono</h2>
+      <div class="clock-row"><div id="hud-clock" class="clock">00:00</div><button id="hud-debrief" class="hud-btn hud-btn-top" title="Bilan (touche B)">Bilan</button></div>
+      <div id="hud-reinf" class="muted"></div>
+    </section>
+    <section class="hud-block">
+      <h2>Sac médical</h2>
+      <ul id="hud-inventory"></ul>
     </section>
     <section class="hud-block">
       <h2>Tri</h2>
@@ -40,8 +45,8 @@
       H : aide / légende<br />
       D : mode calibrage zones
       <div id="hud-seed" style="margin-top:6px"></div>
-      <button id="hud-debrief" class="hud-btn">Bilan (B)</button>
     </section>
+    </div>
   </aside>
 
   <!-- Coordonnées en mode debug -->
@@ -61,7 +66,7 @@
             <div class="face front">
               <img id="modal-img" alt="Fiche victime" />
               <!-- Cases de tri imprimées sur la fiche : zones cliquables -->
-              <button type="button" id="card-view-btn" class="card-view-btn" hidden>↻ Retourner : voir le dos</button>
+              <button type="button" id="card-view-btn" class="card-view-btn" hidden>↻ Voir le dos</button>
               <!-- Évolution complète par-dessus la fiche (la fiche imprimée n'est plus à jour) -->
               <div id="evo-sheet" class="evo-sheet" hidden>
                 <div class="es-head"><span>⚠ Fiche plus à jour — état actuel</span><button type="button" id="es-hide" title="Voir la fiche imprimée d'origine">👁 Fiche d'origine</button></div>
@@ -84,11 +89,14 @@
           </div>
         </div>
         <aside class="care-panel">
+          <div class="care-col scroll-hint">
           <h3>Gestes</h3>
           <div id="care-buttons" class="care-buttons"></div>
           <h3>Position d'attente</h3>
           <div id="pos-buttons" class="care-buttons pos-buttons"></div>
           <div id="care-toast" class="care-toast" aria-live="polite"></div>
+          </div>
+          <div class="care-col scroll-hint">
           <h3>Réalisés</h3>
           <ul id="care-done" class="care-done"></ul>
           <h3>Secouriste</h3>
@@ -102,11 +110,13 @@
           <div class="evac-buttons">
             <button id="evac-walk" type="button">🚶 À pied vers le PMA</button>
             <button id="evac-stretcher" type="button">🚑 Demander un brancardage</button>
+            <button id="evac-priority" type="button" class="prio-btn" title="Passe devant la file ; une seule priorité en attente par équipe (la plus ancienne saute) ; une équipe en route ailleurs est détournée">⚡ Prioritaire</button>
             <button id="evac-cancel" type="button" class="muted-btn" hidden>Annuler la demande</button>
           </div>
           <h3 id="evo-hist-title" hidden>Évolution</h3>
           <ul id="evo-hist" class="evo-hist"></ul>
           <p class="muted small">Tri : cliquer une case de la fiche<br />(ou touches 1 à 4)</p>
+          </div>
         </aside>
       </div>
     </div>
@@ -229,7 +239,7 @@
           <li><b>Agir</b> : panneau « Gestes » à droite de la fiche. Le matériel est compté, les renforts LOG arrivent plus tard. Choisissez aussi la <b>position d'attente</b> (PLS, assis / demi-assis, jambes surélevées, jambes fléchies, à plat dos) : la bonne ralentit l'aggravation, une mauvaise l'accélère.</li>
           <li><b>Réévaluer</b> (une fiche qui a évolué affiche son évolution complète par-dessus la fiche imprimée) : sans prise en charge, les victimes s'aggravent. Une fenêtre « Réévaluation » annonce le changement : retriez si besoin.</li>
           <li><b>Déléguer</b> : quand les secouristes arrivent (avec les renforts), postez-en un auprès d'une victime (bouton « Poster un secouriste ») : compression manuelle ou surveillance, l'aggravation ralentit et il vous alerte si l'état change. Chaque VL LOG amène aussi une <b>équipe SMUR de renfort</b> qui trie seule et demande elle-même les brancardages de ses UA, dans le secteur que vous lui donnez (tableau de bord). Une <b>équipe de pompiers</b> est déjà sur place : elle pose les gestes de secourisme avec son propre sac et vous signale les urgences absolues, mais ne trie pas. Dans le tableau de bord, donnez-leur une zone (« Ordre : … », la zone survolée s'éclaire sur le plan) ; sans ordre, ou une fois la zone terminée, les équipes s'autogèrent. Les pompiers qui arrivent apportent l'<b>oxygène</b> (3 bouteilles par équipe).</li>
-          <li><b>Évacuer</b> vers le PMA, une fois la victime triée : <b>à pied</b> si elle peut marcher, sinon <b>brancardage</b>. Les équipes (pompiers, Croix-Rouge, Sécurité civile) arrivent progressivement. Chaque brancardage mobilise une équipe (aller, conditionnement, retour), et les demandes sont servies dans l'ordre. Au PMA, la victime est prise en charge et ne s'aggrave plus.</li>
+          <li><b>Évacuer</b> (⚡ brancardage prioritaire : une priorité par équipe, la plus ancienne saute ; une équipe en route ailleurs est détournée) vers le PMA, une fois la victime triée : <b>à pied</b> si elle peut marcher, sinon <b>brancardage</b>. Les équipes (pompiers, Croix-Rouge, Sécurité civile) arrivent progressivement. Chaque brancardage mobilise une équipe (aller, conditionnement, retour), et les demandes sont servies dans l'ordre. Au PMA, la victime est prise en charge et ne s'aggrave plus.</li>
           <li><b>Bilan</b> : <kbd>B</kbd> à tout moment. Correction fiche par fiche.</li>
         </ol>
       </section>

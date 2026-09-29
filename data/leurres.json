@@ -1,0 +1,29 @@
+{
+ "_comment": "Fiches LEURRES, inventées, montrées à un joueur sans code valide avant la menace (2 ou 3 cartes). Publiques : ne jamais y mettre une vraie fiche.",
+ "leurres": [
+  {
+   "clinical": {"sex": "Homme", "age": 34, "mechanism": "Chute dans l'escalier pendant l'évacuation", "pres": "Conscient, calme, se tient le poignet droit.", "vent": "FR : 18/min - SpO2 : 98%.", "circ": "FC : 88 bpm - PA : 128/78 mmHg.", "neuro": "GCS 15 (E4 V5 M6).", "lesion": "Traumatisme fermé du poignet droit avec déformation."},
+   "injuries": "fracture:forearm:R",
+   "truth": {"triage": "YELLOW", "accept": ["GREEN"]},
+   "profile": {"stages": [], "actions": {"posSit": {"type": "helpful"}, "posFlat": {"type": "helpful"}}}
+  },
+  {
+   "clinical": {"sex": "Femme", "age": 22, "mechanism": "Éclat de verre (vitre brisée)", "pres": "Consciente, pleure, le mollet saigne.", "vent": "FR : 22/min - SpO2 : 99%.", "circ": "FC : 104 bpm - PA : 118/72 mmHg.", "neuro": "GCS 15 (E4 V5 M6).", "lesion": "Plaie par éclat de verre du mollet gauche, saignement modéré."},
+   "injuries": "cut:calf:L",
+   "truth": {"triage": "YELLOW", "accept": []},
+   "profile": {"stages": [{"at": 20, "triage": "RED", "status": "CRITICAL", "text": "Le pansement de fortune est saturé, pâleur.", "params": "FR 26 · FC 124 · PA 96/60"}], "actions": {"compressive": {"type": "stop", "count": 1}, "tourniquet": {"type": "excessive"}}}
+  },
+  {
+   "clinical": {"sex": "Homme", "age": 51, "mechanism": "Bousculade", "pres": "Conscient, douleur thoracique à l'inspiration.", "vent": "FR : 24/min - SpO2 : 95%.", "circ": "FC : 96 bpm - PA : 140/85 mmHg.", "neuro": "GCS 15 (E4 V5 M6).", "lesion": "Contusion costale droite."},
+   "injuries": "blunt:ribs:R",
+   "truth": {"triage": "YELLOW", "accept": []},
+   "profile": {"stages": [], "actions": {"posSit": {"type": "helpful"}}}
+  },
+  {
+   "clinical": {"sex": "Femme", "age": 29, "mechanism": "Mouvement de foule", "pres": "Consciente, angoissée, respire vite, aucune plainte physique.", "vent": "FR : 26/min - SpO2 : 99%.", "circ": "FC : 110 bpm - PA : 130/80 mmHg.", "neuro": "GCS 15 (E4 V5 M6).", "lesion": "Aucune lésion traumatique retrouvée."},
+   "injuries": "",
+   "truth": {"triage": "GREEN", "accept": ["YELLOW"]},
+   "profile": {"stages": [], "actions": {}}
+  }
+ ]
+}
