@@ -1,0 +1,10 @@
+{
+ "_comment": "Généré par outils/chiffrer.py — scénarios proposés dans le menu.",
+ "scenarios": [
+  {
+   "id": "bataclan",
+   "code": "BAT",
+   "name": "Attaque armée — salle de spectacle"
+  }
+ ]
+}

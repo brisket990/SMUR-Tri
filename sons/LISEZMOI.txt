@@ -1,0 +1,12 @@
+Déposez ici vos sonneries au format MP3, numérotées sans trou :
+
+  sonnerie-01.mp3
+  sonnerie-02.mp3
+  sonnerie-03.mp3
+  …  (jusqu'à sonnerie-30.mp3)
+
+Le jeu les détecte tout seul au lancement (s'arrête au premier numéro manquant).
+Environ 80 % des téléphones utiliseront vos MP3, les autres une sonnerie
+synthétisée (vibreur, sonnette…) pour varier. Réglages : CONFIG.ambience (js/config.js).
+Conseil : des fichiers courts (5 à 15 s) et de volume homogène.
+N'utilisez que des fichiers dont vous avez le droit de vous servir.

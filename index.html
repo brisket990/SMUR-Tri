@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SMUR — Simulation de tri</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Plateau de jeu -->
+  <canvas id="board"></canvas>
+
+  <!-- HUD -->
+  <aside id="hud">
+    <section class="hud-block">
+      <h2>Chrono</h2>
+      <div id="hud-clock" class="clock">00:00</div>
+      <div id="hud-reinf" class="muted"></div>
+    </section>
+    <section class="hud-block">
+      <h2>Sac médical</h2>
+      <ul id="hud-inventory"></ul>
+    </section>
+    <section id="hud-smur-block" class="hud-block" hidden>
+      <h2>Équipes sur place</h2>
+      <ul id="hud-smur" class="smur-list"></ul>
+    </section>
+    <section class="hud-block">
+      <h2>Évacuation</h2>
+      <ul id="hud-evac"></ul>
+    </section>
+    <section class="hud-block">
+      <h2>Tri</h2>
+      <ul id="hud-triage" class="triage-stats"></ul>
+    </section>
+    <section class="hud-block muted small">
+      Glisser : déplacer · Molette : zoom<br />
+      F : recadrer · C : centrer sur l'équipe<br />
+      N : nouvelle partie · M : son<br />
+      H : aide / légende<br />
+      D : mode calibrage zones
+      <div id="hud-seed" style="margin-top:6px"></div>
+      <button id="hud-debrief" class="hud-btn">Bilan (B)</button>
+    </section>
+  </aside>
+
+  <!-- Coordonnées en mode debug -->
+  <div id="debug-coords" hidden></div>
+
+  <!-- Fiche victime plein écran -->
+  <div id="victim-modal" class="modal" hidden>
+    <div class="modal-inner">
+      <header>
+        <span id="modal-title"></span>
+        <button id="modal-close" title="Fermer (Échap)">✕</button>
+      </header>
+      <div class="modal-main">
+        <div class="modal-body">
+          <div id="modal-flip" class="flip">
+            <img id="modal-back" class="face back" alt="" />
+            <div class="face front">
+              <img id="modal-img" alt="Fiche victime" />
+              <!-- Cases de tri imprimées sur la fiche : zones cliquables -->
+              <button type="button" id="card-view-btn" class="card-view-btn" hidden>↻ Retourner : voir le dos</button>
+              <!-- Évolution complète par-dessus la fiche (la fiche imprimée n'est plus à jour) -->
+              <div id="evo-sheet" class="evo-sheet" hidden>
+                <div class="es-head"><span>⚠ Fiche plus à jour — état actuel</span><button type="button" id="es-hide" title="Voir la fiche imprimée d'origine">👁 Fiche d'origine</button></div>
+                <div id="es-body"></div>
+              </div>
+              <button type="button" id="es-show" class="es-show" hidden>⚠ Afficher l'évolution</button>
+              <div class="triage-hotspots">
+                <button data-triage="BLACK"  class="hs hs-ud"   title="UD (touche 1)"></button>
+                <button data-triage="RED"    class="hs hs-ua"   title="UA (touche 2)"></button>
+                <button data-triage="YELLOW" class="hs hs-ur"   title="UR (touche 3)"></button>
+                <button data-triage="GREEN"  class="hs hs-impl" title="Impliqué (touche 4)"></button>
+              </div>
+            </div>
+          </div>
+          <!-- Fenêtre de réévaluation (évolution de la victime) -->
+          <div id="evo-popup" class="evo-popup" hidden>
+            <div class="evo-head"><span>⚠ Réévaluation</span><span id="evo-time"></span></div>
+            <div id="evo-content"></div>
+            <button id="evo-ok">Compris</button>
+          </div>
+        </div>
+        <aside class="care-panel">
+          <h3>Gestes</h3>
+          <div id="care-buttons" class="care-buttons"></div>
+          <h3>Position d'attente</h3>
+          <div id="pos-buttons" class="care-buttons pos-buttons"></div>
+          <div id="care-toast" class="care-toast" aria-live="polite"></div>
+          <h3>Réalisés</h3>
+          <ul id="care-done" class="care-done"></ul>
+          <h3>Secouriste</h3>
+          <div id="resc-status" class="evac-status"></div>
+          <div class="evac-buttons">
+            <button id="resc-post" type="button">👤 Poster un secouriste</button>
+            <button id="resc-free" type="button" class="muted-btn" hidden>Rappeler le secouriste</button>
+          </div>
+          <h3>Évacuation</h3>
+          <div id="evac-status" class="evac-status"></div>
+          <div class="evac-buttons">
+            <button id="evac-walk" type="button">🚶 À pied vers le PMA</button>
+            <button id="evac-stretcher" type="button">🚑 Demander un brancardage</button>
+            <button id="evac-cancel" type="button" class="muted-btn" hidden>Annuler la demande</button>
+          </div>
+          <h3 id="evo-hist-title" hidden>Évolution</h3>
+          <ul id="evo-hist" class="evo-hist"></ul>
+          <p class="muted small">Tri : cliquer une case de la fiche<br />(ou touches 1 à 4)</p>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bilan de fin d'exercice -->
+  <div id="debrief" class="modal" hidden>
+    <div class="modal-inner debrief-inner">
+      <header>
+        <span>Bilan de l'exercice</span>
+        <span>
+          <button id="debrief-new">Nouvelle partie</button>
+          <button id="debrief-print" title="Imprimer ou enregistrer en PDF">🖨 Imprimer / PDF</button>
+          <button id="debrief-history">📋 Historique</button>
+          <button id="debrief-csv">Exporter CSV</button>
+          <button id="debrief-close">✕</button>
+        </span>
+      </header>
+      <div id="debrief-body" class="debrief-body"></div>
+    </div>
+  </div>
+
+  <!-- Menu de départ -->
+  <div id="menu" class="menu" hidden>
+    <form id="menu-form" class="menu-card" autocomplete="off">
+      <img class="menu-art" src="images/verso.jpg" alt="" />
+      <div class="menu-fields">
+        <h1>Simulation de tri</h1>
+        <p class="muted">Afflux massif de victimes · premier tour de catégorisation</p>
+        <label>Nom / équipe
+          <input id="menu-name" maxlength="40" placeholder="ex. Équipe SMUR 1" />
+        </label>
+        <!-- Champ caché : révélé par 3 clics rapides sur la carte (voir menu.js) -->
+        <label id="menu-code-wrap" class="menu-code" hidden>Code
+          <input id="menu-code" type="password" />
+        </label>
+        <label>Scénario
+          <select id="menu-scenario"></select>
+          <span id="menu-scenario-desc" class="menu-desc"></span>
+        </label>
+        <label id="menu-count-wrap" class="menu-range">Nombre de victimes <output id="menu-count-out"></output>
+          <input id="menu-count" type="range" />
+        </label>
+        <label class="menu-game">N° de partie <span class="muted">(facultatif, pour rejouer une partie)</span>
+          <input id="menu-game" inputmode="numeric" placeholder="ex. BAT-138975-40 · vide = nouvelle partie au hasard" />
+        </label>
+        <fieldset class="menu-options">
+          <legend>Ambiance</legend>
+          <label><input type="checkbox" id="opt-bubbles" /> Bulles : appels à l'aide, cris, pleurs</label>
+          <label><input type="checkbox" id="opt-phones" /> Téléphones qui sonnent</label>
+          <label><input type="checkbox" id="opt-sound" /> Sons — touche M en jeu pour couper</label>
+          <label><input type="checkbox" id="opt-outside" /> Sirènes des renforts et radio</label>
+        </fieldset>
+        <div id="menu-stock" class="muted small"></div>
+        <button type="submit" class="menu-start">Commencer l'exercice</button>
+        <button type="button" id="menu-history" class="muted-btn menu-history">📋 Historique des parties</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Briefing de lancement du scénario -->
+  <div id="briefing" class="briefing" hidden>
+    <div class="briefing-card">
+      <div class="briefing-head">
+        <span id="briefing-from"></span>
+        <span id="briefing-time"></span>
+      </div>
+      <h2 id="briefing-title"></h2>
+      <div class="briefing-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="situation" class="on">Situation</button>
+        <button type="button" role="tab" data-tab="tuto">Comment jouer <span id="tuto-new" class="tuto-new" hidden>à lire</span></button>
+      </div>
+      <div data-pane="situation">
+        <div id="briefing-text" class="briefing-text" aria-live="polite"></div>
+        <ul id="briefing-orders" class="briefing-orders" hidden></ul>
+      </div>
+      <div data-pane="tuto" class="tuto-host" hidden></div>
+      <div class="briefing-actions">
+        <button id="briefing-voice" type="button" hidden>🔊 Écouter</button>
+        <button id="briefing-skip" type="button" class="muted-btn">Afficher tout</button>
+        <button id="briefing-go" type="button" class="briefing-go">Engager l'équipe ▸</button>
+      </div>
+      <p class="muted small">Le chronomètre démarre à l'engagement.</p>
+    </div>
+  </div>
+
+  <!-- Historique des parties -->
+  <div id="history" class="modal" hidden>
+    <div class="modal-inner history-inner">
+      <header>
+        <span>Historique des parties (ce navigateur)</span>
+        <span>
+          <button id="history-csv">Exporter CSV</button>
+          <button id="history-clear" class="muted-btn">Effacer</button>
+          <button id="history-close">✕</button>
+        </span>
+      </header>
+      <div id="history-body" class="debrief-body"></div>
+    </div>
+  </div>
+
+  <!-- Aide en jeu (touche H) -->
+  <div id="help" class="modal" hidden>
+    <div class="modal-inner help-inner">
+      <header><span>Comment jouer</span><button id="help-close" title="Fermer (Échap)">✕</button></header>
+      <div class="tuto-host help-body"></div>
+    </div>
+  </div>
+
+  <!-- Tuto : légende et règles (affiché dans le briefing et l'aide) -->
+  <template id="tuto-tpl">
+    <div class="tuto">
+      <section class="tuto-steps">
+        <h4>Déroulé</h4>
+        <ol>
+          <li><b>Explorer</b> : glisser pour déplacer le plan, molette pour zoomer, <kbd>F</kbd> pour tout revoir. La lampe suit la souris.</li>
+          <li><b>Se déplacer</b> : votre équipe (pion <b>SMUR</b>) n'agit que dans son <b>périmètre</b> (cercle pointillé). Cliquer une victime plus loin fait marcher l'équipe jusqu'à elle, et la marche prend du temps. <kbd>C</kbd> recentre sur l'équipe.</li>
+          <li><b>Examiner</b> : cliquer une carte à portée. Elle se retourne et révèle la fiche de la victime.</li>
+          <li><b>Trier</b> : cliquer la case <b>UD, UA, UR ou Impliqué</b> imprimée en bas de la fiche (ou <kbd>1</kbd> à <kbd>4</kbd>).</li>
+          <li><b>Agir</b> : panneau « Gestes » à droite de la fiche. Le matériel est compté, les renforts LOG arrivent plus tard. Choisissez aussi la <b>position d'attente</b> (PLS, assis / demi-assis, jambes surélevées, jambes fléchies, à plat dos) : la bonne ralentit l'aggravation, une mauvaise l'accélère.</li>
+          <li><b>Réévaluer</b> (une fiche qui a évolué affiche son évolution complète par-dessus la fiche imprimée) : sans prise en charge, les victimes s'aggravent. Une fenêtre « Réévaluation » annonce le changement : retriez si besoin.</li>
+          <li><b>Déléguer</b> : quand les secouristes arrivent (avec les renforts), postez-en un auprès d'une victime (bouton « Poster un secouriste ») : compression manuelle ou surveillance, l'aggravation ralentit et il vous alerte si l'état change. Chaque VL LOG amène aussi une <b>équipe SMUR de renfort</b> qui trie seule et demande elle-même les brancardages de ses UA, dans le secteur que vous lui donnez (tableau de bord). Une <b>équipe de pompiers</b> est déjà sur place : elle pose les gestes de secourisme avec son propre sac et vous signale les urgences absolues, mais ne trie pas. Dans le tableau de bord, donnez-leur une zone (« Ordre : … », la zone survolée s'éclaire sur le plan) ; sans ordre, ou une fois la zone terminée, les équipes s'autogèrent. Les pompiers qui arrivent apportent l'<b>oxygène</b> (3 bouteilles par équipe).</li>
+          <li><b>Évacuer</b> vers le PMA, une fois la victime triée : <b>à pied</b> si elle peut marcher, sinon <b>brancardage</b>. Les équipes (pompiers, Croix-Rouge, Sécurité civile) arrivent progressivement. Chaque brancardage mobilise une équipe (aller, conditionnement, retour), et les demandes sont servies dans l'ordre. Au PMA, la victime est prise en charge et ne s'aggrave plus.</li>
+          <li><b>Bilan</b> : <kbd>B</kbd> à tout moment. Correction fiche par fiche.</li>
+        </ol>
+      </section>
+
+      <section>
+        <h4>Sur le plan</h4>
+        <ul class="tuto-legend">
+          <li><span class="lg-card lg-back"></span>Victime non examinée</li>
+          <li><span class="lg-card lg-face"></span>Victime examinée</li>
+          <li><span class="lg-card lg-face lg-tri" style="--c:#d6322f"></span>Victime triée (couleur du tri)</li>
+          <li><span class="lg-card lg-face lg-tq"></span>Garrot en place</li>
+          <li><span class="lg-card lg-face lg-care"></span>Au moins un geste réalisé</li>
+          <li><span class="lg-card lg-face lg-crit"></span>État qui s'aggrave</li>
+          <li><span class="lg-card lg-face lg-dead"></span>Décès</li>
+          <li><span class="lg-team">SMUR</span>Votre équipe et son périmètre d'action</li>
+          <li><span class="lg-pma">▲</span>PMA (nombre de victimes prises en charge)</li>
+          <li><span class="lg-stretch">SP 1</span>Équipe de brancardage en mission</li>
+          <li><span class="lg-emoji">⏳</span>En attente de brancardage</li>
+          <li><span class="lg-resc">S</span>Secouriste posté auprès d'une victime</li>
+          <li><span class="lg-team lg-team2">S2</span>Équipe SMUR de renfort (anneau = examen en cours)</li>
+          <li><span class="lg-sp">VSAV</span>Pompiers sur place (anneau jaune = bilan en cours)</li>
+          <li><span class="lg-flag">!</span>Urgence absolue signalée par les pompiers, pas encore triée</li>
+          <li><span class="lg-bubble">Aidez-moi !</span>Appel, cri, pleurs</li>
+          <li><span class="lg-bubble lg-phone">📱 DRING</span>Téléphone qui sonne</li>
+        </ul>
+      </section>
+
+      <section>
+        <h4>Catégories de tri</h4>
+        <ul class="tuto-tri">
+          <li><span class="tag" style="background:#6b6b6b;color:#fff">UD</span>Urgence dépassée</li>
+          <li><span class="tag" style="background:#d6322f;color:#fff">UA</span>Urgence absolue : détresse vitale</li>
+          <li><span class="tag" style="background:#f6bf2e">UR</span>Urgence relative : blessé sans détresse</li>
+          <li><span class="tag" style="background:#3b8f3b;color:#fff">Impliqué</span>Pas de lésion physique</li>
+        </ul>
+        <h4>Le sac</h4>
+        <ul class="tuto-items">
+          <li><b>Garrot tactique</b> : hémorragie d'un membre</li>
+          <li><b>Pansement compressif</b> : plaie qui saigne</li>
+          <li><b>Pansement hémostatique</b> : cou, aisselle, racine de cuisse, bassin</li>
+          <li><b>Pansement 3 côtés</b> : plaie du thorax</li>
+          <li><b>Stylo d'exsufflation</b> : pneumothorax compressif (détresse, thorax distendu)</li>
+          <li><b>Couverture de survie</b> : choc, brûlé, hypothermie</li>
+          <li><b>PLS</b> : victime inconsciente qui respire</li>
+        </ul>
+      </section>
+
+      <section class="tuto-keys">
+        <h4>Raccourcis</h4>
+        <p><kbd>1</kbd>–<kbd>4</kbd> trier · <kbd>Échap</kbd> fermer la fiche · <kbd>F</kbd> recadrer · <kbd>C</kbd> centrer sur l'équipe · <kbd>B</kbd> bilan · <kbd>M</kbd> son · <kbd>H</kbd> cette aide · <kbd>N</kbd> nouvelle partie</p>
+        <p class="muted">Tableau de bord à droite : chrono, contenu du sac, prochain renfort, équipes de brancardage et PMA, compteurs de tri et décès.</p>
+      </section>
+    </div>
+  </template>
+
+  <!-- Écran de fin : accès non autorisé -->
+ <div id="card-view" class="card-view" hidden>
+    <div class="cv-box">
+      <header><b class="cv-title"></b><button type="button" class="cv-close" title="Fermer (Échap)">✕</button></header>
+      <div class="cv-main"><img alt="Fiche victime" /><aside class="cv-evo"></aside></div>
+    </div>
+  </div>
+  <div id="end-banner" class="end-banner" hidden>
+    <div class="end-inner"><div class="end-title">Fin de l'exercice</div><p></p><span class="muted">Ouverture du bilan…</span></div>
+  </div>
+  <div id="death" class="death" hidden>
+    <div class="death-inner">
+      <div class="death-title">Vous avez été tué</div>
+      <p>Vous êtes entré dans une zone non sécurisée.<br />Accès à la simulation non autorisé.</p>
+      <button id="death-menu">Retour au menu</button>
+    </div>
+  </div>
+
+  <!-- Écran de chargement -->
+  <div id="loading" hidden>
+    <div>Chargement des ressources…</div>
+    <div class="bar"><div id="loading-bar"></div></div>
+    <div id="loading-text" class="muted small"></div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

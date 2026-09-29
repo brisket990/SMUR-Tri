@@ -1,0 +1,335 @@
+{
+ "_comment": "Description publique du scénario (aucune donnée clinique). Les fiches et le tri attendu sont chiffrés à part par outils/chiffrer.py. Coordonnées des zones : 0..1 du plan, [x, y, largeur, hauteur] ; touche D en jeu pour les afficher.",
+ "id": "bataclan",
+ "code": "BAT",
+ "name": "Attaque armée — salle de spectacle",
+ "subtitle": "Tirs et explosions dans une salle de concert, afflux massif de victimes",
+ "plan": "plan.jpg",
+ "cardBack": "../../images/verso.jpg",
+ "victims": {
+  "min": 15,
+  "max": 150,
+  "step": 5,
+  "default": 50
+ },
+ "stock": {
+  "tourniquet": 9,
+  "compressive": 9,
+  "hemostatic": 9,
+  "chestSeal": 3,
+  "needle": 3,
+  "blanket": 9,
+  "oxygen": 2
+ },
+ "stockFor": 150,
+ "logistics": [
+  {
+   "atMin": 12,
+   "label": "VL LOG 1",
+   "items": {
+    "tourniquet": 10,
+    "compressive": 15,
+    "hemostatic": 6,
+    "chestSeal": 8,
+    "blanket": 20,
+    "needle": 4
+   },
+   "smurTeams": 1
+  },
+  {
+   "atMin": 25,
+   "label": "VL LOG 2",
+   "items": {
+    "tourniquet": 15,
+    "compressive": 20,
+    "hemostatic": 8,
+    "chestSeal": 10,
+    "blanket": 30,
+    "needle": 6
+   },
+   "smurTeams": 1
+  }
+ ],
+ "briefing": {
+  "from": "CRRA 92 — Régulation médicale",
+  "time": "22 h 10",
+  "title": "Attaque armée dans une salle de spectacle",
+  "paragraphs": [
+   "Exercice, exercice, exercice.",
+   "Une attaque armée est survenue il y a quarante minutes dans une salle de concert d'environ 1 500 places. Plusieurs assaillants ont ouvert le feu sur le public et des explosions ont été entendues.",
+   "Les forces d'intervention viennent de neutraliser la menace. La salle est déclarée sécurisée pour l'entrée des équipes de secours.",
+   "Vous êtes la première équipe SMUR engagée à l'intérieur. Les victimes sont dispersées dans la fosse, au balcon, autour du bar, dans les escaliers et les couloirs de sortie. {victimes}",
+   "Une équipe de pompiers (VSAV) est déjà engagée dans la salle avec vous : elle fait les bilans secouristes, pose les gestes de secourisme avec son propre sac et vous signale les urgences absolues. Le tri reste le vôtre.",
+   "Votre mission : le premier tour de catégorisation. Examinez un maximum de victimes, triez-les en UD, UA, UR ou Impliqué, et ne réalisez que les gestes qui sauvent.",
+   "Votre sac contient : {sac}. {renfort}"
+  ],
+  "orders": [
+   "Quelques secondes par victime : trier d'abord, soigner ensuite.",
+   "L'état des victimes évolue : réévaluez.",
+   "Le matériel est compté : chaque garrot doit sauver une vie."
+  ]
+ },
+ "zones": [
+  {
+   "id": "fosse",
+   "label": "Fosse",
+   "kind": "fosse",
+   "weight": 50,
+   "rects": [
+    [
+     0.34,
+     0.345,
+     0.32,
+     0.33
+    ],
+    [
+     0.37,
+     0.675,
+     0.26,
+     0.02
+    ]
+   ]
+  },
+  {
+   "id": "balcon",
+   "label": "Balcon (gradins)",
+   "kind": "balcon",
+   "weight": 18,
+   "rects": [
+    [
+     0.345,
+     0.73,
+     0.31,
+     0.155
+    ],
+    [
+     0.255,
+     0.655,
+     0.09,
+     0.11
+    ],
+    [
+     0.655,
+     0.655,
+     0.09,
+     0.11
+    ]
+   ]
+  },
+  {
+   "id": "bar",
+   "label": "Bar",
+   "kind": "bar",
+   "weight": 8,
+   "rects": [
+    [
+     0.678,
+     0.3,
+     0.032,
+     0.28
+    ]
+   ]
+  },
+  {
+   "id": "scene",
+   "label": "Scène",
+   "kind": "scene",
+   "weight": 3,
+   "rects": [
+    [
+     0.4,
+     0.19,
+     0.21,
+     0.1
+    ]
+   ]
+  },
+  {
+   "id": "escaliers_gauche",
+   "label": "Escaliers balcon",
+   "kind": "escalier",
+   "weight": 6,
+   "rects": [
+    [
+     0.222,
+     0.33,
+     0.052,
+     0.235
+    ],
+    [
+     0.152,
+     0.4,
+     0.025,
+     0.145
+    ]
+   ]
+  },
+  {
+   "id": "mezzanine",
+   "label": "Mezzanine",
+   "kind": "hall",
+   "weight": 3,
+   "rects": [
+    [
+     0.152,
+     0.56,
+     0.062,
+     0.055
+    ]
+   ]
+  },
+  {
+   "id": "couloir_gauche",
+   "label": "Couloir sortie gauche",
+   "kind": "sortie",
+   "weight": 5,
+   "rects": [
+    [
+     0.152,
+     0.235,
+     0.215,
+     0.04
+    ],
+    [
+     0.315,
+     0.285,
+     0.015,
+     0.3
+    ]
+   ]
+  },
+  {
+   "id": "couloir_droit",
+   "label": "Couloir sortie droite",
+   "kind": "sortie",
+   "weight": 5,
+   "rects": [
+    [
+     0.628,
+     0.235,
+     0.15,
+     0.04
+    ],
+    [
+     0.785,
+     0.6,
+     0.02,
+     0.23
+    ]
+   ]
+  }
+ ],
+ "scale": {
+  "planWidthMeters": 50,
+  "_comment": "largeur réelle représentée par le plan, pour convertir distances et temps"
+ },
+ "team": {
+  "start": [
+   0.735,
+   0.8
+  ],
+  "reachMeters": 4,
+  "speedMps": 1.5,
+  "label": "SMUR"
+ },
+ "evacuation": {
+  "pma": [
+   0.757,
+   0.87
+  ],
+  "pmaLabel": "PMA",
+  "walkSpeedMps": 0.8,
+  "stretcherSpeedMps": 0.7,
+  "emptySpeedMps": 1.2,
+  "loadSec": 70,
+  "unloadSec": 30,
+  "teams": [
+   {
+    "atMin": 4,
+    "org": "Pompiers",
+    "prefix": "SP",
+    "count": 2,
+    "color": "#e53935",
+    "rescuers": 2,
+    "items": {
+     "oxygen": 3,
+     "tourniquet": 3,
+     "compressive": 4,
+     "blanket": 6
+    }
+   },
+   {
+    "atMin": 9,
+    "org": "Croix-Rouge",
+    "prefix": "CRF",
+    "count": 2,
+    "color": "#f5f5f5",
+    "rescuers": 3
+   },
+   {
+    "atMin": 14,
+    "org": "Sécurité civile",
+    "prefix": "SC",
+    "count": 3,
+    "color": "#ffb300",
+    "rescuers": 4
+   },
+   {
+    "atMin": 20,
+    "org": "Pompiers (renfort)",
+    "prefix": "SP",
+    "count": 2,
+    "color": "#e53935",
+    "rescuers": 2,
+    "items": {
+     "oxygen": 3,
+     "tourniquet": 3,
+     "compressive": 4,
+     "blanket": 6
+    }
+   }
+  ],
+  "fatiguePerTrip": 0.12,
+  "fatigueMax": 0.6,
+  "rescuerEffect": {
+   "compression": 2,
+   "surveillance": 1.3
+  },
+  "_items": "teams[].items : matériel apporté PAR ÉQUIPE et versé dans le sac commun à son arrivée (pompiers : O2, garrots, pansements, couvertures).",
+  "pmaClearMeters": 7
+ },
+ "smurTeams": {
+  "speedMps": 1.3,
+  "examineSec": 40,
+  "careSec": 30,
+  "doCare": true
+ },
+ "pompiers": {
+  "_comment": "Équipe déjà sur place à T+0 : ne trie pas, gestes de secourisme avec son propre sac, signale les UA (drapeau « ! »). enabled: false pour la retirer.",
+  "enabled": true,
+  "label": "Pompiers",
+  "vehicle": "VSAV",
+  "teams": 1,
+  "speedMps": 1.2,
+  "bilanSec": 35,
+  "careSec": 25,
+  "bag": {
+   "tourniquet": 4,
+   "compressive": 6,
+   "blanket": 6,
+   "oxygen": 3
+  },
+  "_bag": "Sac des pompiers : garrots, pansements compressifs, couvertures, O2. Pas d'hémostatique, de 3 côtés ni de stylo d'exsufflation."
+ },
+ "intro": {
+  "_comment": "Animation d'arrivée : appel des valides. walkers = [min, max] fausses cartes (tirage au hasard entre les deux), qui rejoignent le SMUR puis le PMA. Purement visuel.",
+  "enabled": true,
+  "text": "Si vous pouvez marcher, venez vers moi !",
+  "walkers": [
+   45,
+   55
+  ]
+ },
+ "stockFixed": true,
+ "_stock": "stock = sac du SMUR joueur au départ. stockFixed: true → ces quantités ne varient pas avec le nombre de victimes (les VL LOG, elles, sont ajustées)."
+}
