@@ -74,6 +74,8 @@ export function createDebrief(state, { history } = {}) {
 
   let fb = [];
   let filter = 'issues';
+  // MPAP : le bilan ne porte que sur les fiches effectivement regardées
+  const scope = () => (state.mpap ? { ...state, victims: state.victims.filter((v) => v.seenAt != null) } : state);
 
   function renderList() {
     const q = (document.getElementById('fb-search')?.value ?? '').trim().toLowerCase().replace('_', '-');
@@ -112,7 +114,7 @@ export function createDebrief(state, { history } = {}) {
       </summary>
       <div class="fb-grid">
         <section><h4>Ce que vous avez fait</h4>
-          ${f.did.length ? `<ul>${f.did.map((x) => `<li><span class="t">${formatTime(x.t)}</span>${esc(x.text)}${x.note ? ` <span class="${x.cls ?? ''}">— ${esc(x.note)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted">Rien : victime non examinée.</p>'}
+          ${f.did.length ? `<ul>${f.did.map((x) => `<li>${state.mpap ? '' : `<span class="t">${formatTime(x.t)}</span>`}${esc(x.text)}${x.note ? ` <span class="${x.cls ?? ''}">— ${esc(x.note)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted">Rien : victime non examinée.</p>'}
         </section>
         <section><h4>Ce qu'il fallait faire</h4>
           <ul>${f.should.map((s) => `<li>${s}</li>`).join('')}</ul>
@@ -130,9 +132,11 @@ export function createDebrief(state, { history } = {}) {
   }
 
   function render() {
-    const d = computeDebrief(state);
-    fb = analyzeAll(state);
-    body.innerHTML = `
+    const S = scope();
+    const d = computeDebrief(S);
+    fb = analyzeAll(S);
+    if (state.mpap) { filter = 'all'; body.innerHTML = mpapHead(d); }
+    else body.innerHTML = `
       <p class="muted">${state.player?.name ? `<b style="color:var(--text)">${esc(state.player.name)}</b> · ` : ''}${esc(state.scenario?.name ?? '')}${state.scenario?.random ? ' (hasard total)' : ''} · ${state.count ?? d.total} victimes · exercice arrêté à T+${formatTime(state.clock.elapsedMs)}</p>
       ${state.endReason ? `<p class="end-reason">✓ ${esc(state.endReason)}</p>` : ''}
       <p class="replay">Pour rejouer exactement cette partie (mêmes victimes, mêmes emplacements) : saisir <b>${state.gameNumber}</b> dans « N° de partie » du menu.</p>
@@ -154,26 +158,50 @@ export function createDebrief(state, { history } = {}) {
         ${kpi(d.badCares.length, 'gestes non indiqués / excessifs', d.badCares.length ? 'bad' : '')}
       </div>
 
-      <h3>Correction fiche par fiche</h3>
-      <div class="fb-tools">
-        <div class="fb-filters" role="group">
-          <button data-f="issues">À corriger (${fb.filter((f) => f.issues.some((i) => i.weight > 0)).length})</button>
-          <button data-f="seen">Examinées (${fb.filter((f) => f.v.seenAt != null).length})</button>
-          <button data-f="unseen">Non examinées (${fb.filter((f) => f.v.seenAt == null).length})</button>
-          <button data-f="all">Toutes (${fb.length})</button>
-        </div>
-        <input id="fb-search" type="search" placeholder="Rechercher : BC-45, garrot, thorax…" />
-      </div>
-      <div id="fb-list" class="fb-list"></div>
-    `;
+      ${tools()}`;
+    if (!document.getElementById('fb-search')) return;     // MPAP : aucune fiche regardée
     body.querySelectorAll('.fb-filters button').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.f; renderList(); }));
     document.getElementById('fb-search').addEventListener('input', () => { if (filter === 'issues') filter = 'all'; renderList(); });
     renderList();
   }
 
+  // MPAP : pas de chrono ni de délais ; uniquement les fiches regardées
+  function mpapHead(d) {
+    const pma = d.pma;
+    return `
+      <p class="muted">${esc(state.scenario?.name ?? '')} · <b style="color:var(--text)">${d.total} fiche${d.total > 1 ? 's' : ''} regardée${d.total > 1 ? 's' : ''}</b> sur ${state.victims.length} · le bilan ne porte que sur ces fiches</p>
+      ${d.total ? `<div class="kpis">
+        ${kpi(`${d.triaged}/${d.total}`, 'fiches triées')}
+        ${kpi(d.exact + d.accepted, `tris justes (${d.accepted} défendables)`, 'good')}
+        ${kpi(d.over, 'sur-tris', d.over ? 'bad' : '')}
+        ${kpi(d.under, 'sous-tris', d.under ? 'bad' : '')}
+        ${kpi(d.redTotal, 'UA parmi les fiches regardées')}
+        ${kpi(`${d.pmaRed}/${d.redTotal}`, 'UA envoyées au PMA', d.redTotal && d.pmaRed < d.redTotal ? 'bad' : 'good')}
+        ${kpi(pma, 'fiches envoyées au PMA')}
+        ${kpi(d.cares.length, 'gestes réalisés')}
+        ${kpi(d.badCares.length, 'gestes non indiqués / excessifs', d.badCares.length ? 'bad' : '')}
+      </div>` : ''}
+      ${d.total ? tools(true) : '<p class="muted">Aucune fiche regardée pour l\'instant : cliquez sur des cartes de la scène, puis revenez au bilan.</p>'}`;
+  }
+
+  function tools(mpap = false) {
+    return `
+      <h3>Correction fiche par fiche</h3>
+      <div class="fb-tools">
+        <div class="fb-filters" role="group">
+          <button data-f="issues">À corriger (${fb.filter((f) => f.issues.some((i) => i.weight > 0)).length})</button>
+          ${mpap ? '' : `<button data-f="seen">Examinées (${fb.filter((f) => f.v.seenAt != null).length})</button>
+          <button data-f="unseen">Non examinées (${fb.filter((f) => f.v.seenAt == null).length})</button>`}
+          <button data-f="all">${mpap ? 'Fiches regardées' : 'Toutes'} (${fb.length})</button>
+        </div>
+        <input id="fb-search" type="search" placeholder="Rechercher : BC-45, garrot, thorax…" />
+      </div>
+      <div id="fb-list" class="fb-list"></div>`;
+  }
+
   function csv() {
     const head = ['ID', 'Lésion', 'Tri attendu (fiche)', 'Tolérés', 'Tri choisi', 'Verdict', 'Heure tri', 'Examinée', 'Statut final', 'Tri attendu (fin)', 'Gestes réalisés', 'Il fallait', 'Oublis et erreurs', 'Justification'];
-    const rows = analyzeAll(state).sort((a, b) => +a.v.id.slice(3) - +b.v.id.slice(3)).map((f) => {
+    const rows = analyzeAll(scope()).sort((a, b) => +a.v.id.slice(3) - +b.v.id.slice(3)).map((f) => {
       const v = f.v;
       const h = v.triageHistory.at(-1);
       const t = feedbackText(f);

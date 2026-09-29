@@ -386,7 +386,7 @@ async function boot() {
   }
   team.onArrive = (v) => { if (!modal.isOpen() && !state.over) examine(v); };
 
-  if (authorized) window.sim = { state, camera, modal, debrief, team, evac, rescuers, smur, pompiers }; // accès console (formateur / tests)
+  if (authorized) window.sim = { state, camera, modal, debrief, team, evac, rescuers, smur, pompiers, examine }; // accès console (formateur / tests)
   else $('hud-debrief').hidden = true;
 
   // Retour au menu (tous modes), avec confirmation
