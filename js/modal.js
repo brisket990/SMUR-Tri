@@ -11,7 +11,7 @@ import { KIND_LABEL } from './evolution.js';
 
 const JUDGE_LABEL = { exact: 'Tri juste', accepted: 'Tri défendable', over: 'Sur-tri', under: 'Sous-tri' };
 
-export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage, onCare, onClose, onRevealed, onView }) {
+export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage, onCare, onClose, onRevealed, onView, onEvoAt }) {
   const $ = (id) => document.getElementById(id);
   const modal = $('victim-modal');
   const title = $('modal-title');
@@ -58,6 +58,33 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
     (item.group === 'position' && posBox ? posBox : careBox).appendChild(b);
     return b;
   });
+
+  // ---------- MPAP : envoi au PMA et évolution à la demande ----------
+  const pmaBtn = $('evac-pma');
+  pmaBtn.addEventListener('click', () => evacAction('pma')());   // evacAction est défini plus bas
+  const evoBox = $('mpap-evo');
+  const evoNote = $('mpap-evo-note');
+  const EVO_TIMES = [0, 5, 10, 20, 30];
+  evoBox.innerHTML = EVO_TIMES.map((m) => `<button type="button" data-evo="${m}">${m ? `T+${m}` : 'Initial'}</button>`).join('');
+  evoBox.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-evo]');
+    if (!b || !current || !onEvoAt) return;
+    const res = onEvoAt(current, Number(b.dataset.evo));
+    evoNote.textContent = res?.message ?? '';
+    refresh();
+  });
+  function refreshMpap(v) {
+    if (!state.mpap) return;
+    const has = v.evo.stages.length > 0;
+    evoBox.querySelectorAll('[data-evo]').forEach((b) => {
+      b.classList.toggle('on', Number(b.dataset.evo) === (v.mpapT ?? 0));
+      b.disabled = !has;
+    });
+    if (!has) evoNote.textContent = 'Pas d\'évolution prévue pour cette victime.';
+    const st = v.evac?.state ?? 'none';
+    pmaBtn.disabled = st === 'pma' || v.status === 'DEAD';
+    pmaBtn.textContent = st === 'pma' ? '🏥 Au PMA' : '🏥 Envoyer au PMA';
+  }
 
   // ---------- vue de face / de dos (fiches générées) ----------
   const viewBtn = $('card-view-btn');
@@ -193,12 +220,13 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
           const cls = CONFIG.immediateFeedback ? `k-${c.kind}` : '';
           const it = CONFIG.items[c.action];
           const who = c.by ? ` <span class="muted">(${c.by})</span>` : '';
-          return `<li class="${cls}"><span class="t">${formatTime(c.t)}</span>${it.group === 'position' ? 'Position : ' + it.label.toLowerCase() : it.label}${who}</li>`;
+          return `<li class="${cls}">${state.mpap ? '' : `<span class="t">${formatTime(c.t)}</span>`}${it.group === 'position' ? 'Position : ' + it.label.toLowerCase() : it.label}${who}</li>`;
         }).join('')
       : '<li class="muted">Aucun</li>';
 
     refreshEvac(v);
     refreshRescuer(v);
+    refreshMpap(v);
     refreshSheet(v);
 
     const seen = v.evo.stages.slice(0, v.evo.seenStage);
@@ -309,6 +337,7 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
   // ---------- ouverture / fermeture ----------
   function open(victim, backSrc = null) {
     current = victim;
+    evoNote.textContent = '';
     viewBtn.hidden = !victim.entry || !onView;
     if (victim.entry) viewBtn.textContent = viewLabel(victim);
     esHidden = false;

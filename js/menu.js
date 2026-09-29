@@ -85,7 +85,8 @@ export function showMenu(scenarios) {
     }
     const n = Number(range.value);
     out.textContent = n;
-    stock.textContent = 'Sac de départ : ' + describeStock(scaledStock(n, sc).items);
+    stock.textContent = sc.mpapOf ? 'MPAP : matériel illimité, pas de chrono, pas de déplacement. Évolution des victimes à la demande (T+5, T+10…).'
+      : 'Sac de départ : ' + describeStock(scaledStock(n, sc).items);
   }
 
   select.addEventListener('change', () => { setupRange(); preview(); });

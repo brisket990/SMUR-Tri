@@ -2,10 +2,11 @@
 //  Point d'entrée : chargement → construction de l'état → boucle
 // ============================================================
 
-import { CONFIG } from './config.js';
+import { CONFIG, STATUS } from './config.js';
 import { createRng } from './rng.js';
 import { loadImage, fetchJSON, makeThumb, mapPool, placeholderCard, placeholderPlan } from './assets.js';
 import { placeVictims } from './placement.js';
+import { placeMPAP } from './mpap.js';
 import { createVictim, createGameState, assignTriage, markSeen, logEvent } from './state.js';
 import { updateSim } from './sim.js';
 import { Camera } from './camera.js';
@@ -54,6 +55,12 @@ async function boot() {
     return { ...s, ...desc, base, public: pub };
   }));
   if (!scenarios.length) throw new Error('Aucun scénario : lancez outils/chiffrer.py');
+  // mode MPAP : même scénario, présenté sur écran (sans chrono, compteurs ni déplacement)
+  for (const s of [...scenarios]) {
+    if (s.mpap === false) continue;
+    scenarios.push({ ...s, id: `${s.id}-mpap`, dataId: s.id, code: `${s.code}M`, name: `${s.name} (MPAP)`, mpapOf: s.id,
+      subtitle: 'MPAP : scène projetée, cliquer une carte au hasard, discuter des gestes, trier, envoyer au PMA. Sans chrono, sans compteurs, sans déplacement.' });
+  }
 
   // 2. Menu : nom, scénario / hasard total, nombre de victimes, n° de partie, code
   const history = createHistory();
@@ -67,12 +74,14 @@ async function boot() {
   let scenario = scenarios.find((s) => s.id === choice.scenarioId);
   let count = choice.count;
   if (!scenario) {
-    scenario = scenarios[Math.floor(Math.random() * scenarios.length)];
+    const pool = scenarios.filter((s) => !s.mpapOf);
+    scenario = pool[Math.floor(Math.random() * pool.length)];
     const r = victimRange(scenario);
     const steps = Math.floor((r.max - r.min) / r.step);
     count = r.min + r.step * Math.floor(Math.random() * (steps + 1));
   }
   const zones = scenario.zones;
+  const MPAP = !!scenario.mpapOf;
 
   // 3. Le code déverrouille la clé des fichiers ; sans elle, rien n'est lisible
   let access = null;
@@ -89,7 +98,7 @@ async function boot() {
   let entries;
   let profiles = {};
   if (authorized) {
-    const sid = scenario.id;
+    const sid = scenario.dataId ?? scenario.id;
     const manifest = await openJSON(access.key, `${scenario.base}victims.enc`, `${sid}/victims`);
     ({ profiles } = await openJSON(access.key, `${scenario.base}profiles.enc`, `${sid}/profiles`));
     entries = selectVictims(manifest.victims, count, rng);
@@ -185,22 +194,29 @@ async function boot() {
   const pxPerM = plan.w / (scenario.scale?.planWidthMeters ?? 50);
   const avoid = scenario.evacuation?.pma
     ? [{ x: scenario.evacuation.pma[0] * plan.w, y: scenario.evacuation.pma[1] * plan.h, r: (scenario.evacuation.pmaClearMeters ?? 7) * pxPerM }] : [];
-  const placements = placeVictims(entries, zones, plan, card, CONFIG, rng, avoid);
+  const placements = MPAP && authorized
+    ? placeMPAP(entries, zones, plan, card, rng, scenario, [{ ...avoid[0], r: (scenario.mpap?.pmaClearMeters ?? 4) * pxPerM }].filter((a) => a.x != null))
+    : placeVictims(entries, zones, plan, card, CONFIG, rng, avoid);
   const zoneLabel = Object.fromEntries(zones.map((z) => [z.id, z.label]));
   const victims = entries.map((e, i) => {
     const v = createVictim(e, placements[i], { ...visuals[i], back: backThumb, ...card });
     if (visuals[i].generated) { v.entry = e; v.cardView = 'face'; v.cardSig = '0||face'; }
+    v.sortY = placements[i].coverY ?? v.y;          // MPAP : carte cachée sous un corps
+    v.hiddenUnder = !!placements[i].hidden;
     v.zoneLabel = zoneLabel[v.zone];
     const profile = profiles[e.profile] ?? { stages: [], actions: {} };
     if (authorized && !profiles[e.profile]) console.warn(`${e.id} : profil "${e.profile}" inconnu`);
     initEvolution(v, profile, e.actions);
     return v;
   });
-  victims.sort((a, b) => a.y - b.y); // les cartes "devant" sont dessinées en dernier
+  // les cartes "devant" sont dessinées en dernier ; une carte cachée est dessinée juste avant son couvercle
+  victims.sort((a, b) => (a.sortY - b.sortY) || ((b.hiddenUnder ? 1 : 0) - (a.hiddenUnder ? 1 : 0)));
   const stock = scaledStock(entries.length, scenario);
   const player = { name: choice.name, authorized, label: access?.label ?? null };
   const state = createGameState({ plan, zones, victims, stock, player });
   state.clock.running = false;           // démarre à l'engagement (fin du briefing)
+  state.mpap = MPAP;
+  if (MPAP) for (const k of Object.keys(state.inventory)) state.inventory[k] = Infinity;   // matériel illimité
   state.seed = seed;
   state.count = entries.length;
   state.scenario = { id: scenario.id, name: scenario.name, random: !choice.scenarioId };
@@ -211,11 +227,19 @@ async function boot() {
   $('hud-seed').title = 'Saisir ce numéro dans le menu (« N° de partie ») pour rejouer exactement cette partie';
 
   // 9. Affichage + interactions
+  if (MPAP) {
+    // scène projetée : moins de pénombre, pas de tableau de bord chiffré
+    CONFIG.flashlight.darkness = Math.min(CONFIG.flashlight.darkness, scenario.mpap?.darkness ?? 0.3);
+    document.body.classList.add('mpap');
+    $('mpap-bar').hidden = false;
+    $('mpap-title').textContent = scenario.name;
+    if (cardOpts) cardOpts.noTimes = true;
+  }
   const canvas = $('board');
   const camera = new Camera();
   const renderer = createRenderer(canvas, camera, CONFIG);
   renderer.resize();
-  camera.fit(plan.w, plan.h, { rightReserve: hudWidth() });
+  camera.fit(plan.w, plan.h, { rightReserve: MPAP ? 0 : hudWidth() });
 
   // Équipe SMUR (périmètre d'action) et évacuation vers le PMA
   const team = createTeam(state, scenario, plan);
@@ -231,7 +255,7 @@ async function boot() {
   state.rescuerSummary = rescuers.summary;
   const smur = createSmurTeams(state, scenario, plan, { playerTeam: team, evac });
   // équipe de pompiers déjà sur place : bilans, gestes de secourisme, signalement des UA
-  const pompiers = createPompiers(state, scenario, plan, {
+  const pompiers = createPompiers(state, MPAP ? { ...scenario, pompiers: { enabled: false } } : scenario, plan, {
     playerTeam: team,
     onSignal: (v, tm) => amb?.alert(v, `${tm.id} : urgence absolue ici !`),
     onGive: (tm, got) => {
@@ -246,6 +270,20 @@ async function boot() {
   const debrief = createDebrief(state, { history });
   $('hud-debrief').addEventListener('click', () => debrief.open());
   const modal = createModal({
+    // MPAP : état de la victime à T+n minutes (sans prise en charge ; un geste qui stabilise arrête l'évolution)
+    onEvoAt: (v, min) => {
+      v.status0 ??= v.status;
+      const e = v.evo;
+      const target = e.stages.filter((st) => st.atMs <= min * 60000).length;
+      const stage = e.frozen ? Math.min(e.stage, target) : target;
+      e.stage = stage;
+      e.seenStage = stage;
+      v.status = stage ? (STATUS[e.stages[stage - 1].status] ?? v.status0) : v.status0;
+      v.mpapT = min;
+      logEvent(state, 'mpap-evo', { id: v.id, min, stage });
+      if (e.frozen && target > stage) return { message: 'Stabilisée par un geste : plus d\'aggravation.' };
+      return { message: stage ? `T+${min} min : ${e.stages[stage - 1].text}` : (min ? `T+${min} min : pas d'aggravation à ce stade.` : 'État initial de la fiche.') };
+    },
     onView: (v) => { v.cardView = v.cardView === 'dos' ? 'face' : 'dos'; logEvent(state, 'view', { id: v.id, view: v.cardView }); return refreshCard(v, true); },
     state,
     evac,
@@ -258,7 +296,7 @@ async function boot() {
     },
     onEvac: (id, mode) => {
       const v = state.byId.get(id);
-      const res = mode === 'walk' ? evac.walk(v) : mode === 'cancel' ? evac.cancel(v) : mode === 'priority' ? evac.prioritize(v) : evac.requestStretcher(v);
+      const res = mode === 'walk' ? evac.walk(v) : mode === 'cancel' ? evac.cancel(v) : mode === 'priority' ? evac.prioritize(v) : mode === 'pma' ? evac.sendToPMA(v) : evac.requestStretcher(v);
       hud.update(state);
       return res;
     },
@@ -268,7 +306,7 @@ async function boot() {
       hud.update(state);
       return res;
     },
-    onClose: () => { if (CONFIG.clock.pauseOnModal) state.clock.running = true; },
+    onClose: () => { if (CONFIG.clock.pauseOnModal && !MPAP) state.clock.running = true; },
     // Mode non autorisé : la carte retournée révèle une menace → mort
     onRevealed: (v) => {
       if (authorized || v?.decoy) return true;       // fiche leurre : jouable
@@ -280,11 +318,19 @@ async function boot() {
   });
 
   const mouse = attachInput(canvas, camera, CONFIG, {
+    onGrab: MPAP ? (sx, sy) => {
+      const [wx, wy] = camera.screenToWorld(sx, sy);
+      const v = pickVictim(state, wx, wy);
+      if (!v) return null;
+      const i = state.victims.indexOf(v);            // la carte saisie passe au-dessus
+      state.victims.splice(i, 1); state.victims.push(v);
+      return { move: (dx, dy) => { v.x += dx / camera.zoom; v.y += dy / camera.zoom; } };
+    } : null,
     onMove: (m, dragging) => {
       const [wx, wy] = camera.screenToWorld(m.x, m.y);
       const v = dragging ? null : pickVictim(state, wx, wy);
       state.ui.hoveredId = v?.id ?? null;
-      state.ui.hoverNote = v && !team.inReach(v)
+      state.ui.hoverNote = v && !MPAP && !team.inReach(v)
         ? `Hors de portée · ${Math.round(team.distMeters(v))} m (≈ ${Math.ceil(team.etaTo(v))} s de marche)`
         : null;
       canvas.classList.toggle('hovering', !!v);
@@ -293,7 +339,7 @@ async function boot() {
       }
     },
     onClick: (sx, sy) => {
-      if (state.over || !state.clock.running) return;
+      if (state.over || (!state.clock.running && !MPAP)) return;
       const [wx, wy] = camera.screenToWorld(sx, sy);
       if (state.ui.debugZones) {
         const txt = `[${(wx / plan.w).toFixed(3)}, ${(wy / plan.h).toFixed(3)}]`;
@@ -303,6 +349,7 @@ async function boot() {
       }
       const v = pickVictim(state, wx, wy);
       // périmètre : on n'examine que les victimes à portée ; sinon l'équipe s'y rend
+      if (MPAP) { if (v) examine(v); return; }      // MPAP : pas de déplacement
       if (!v) { team.goTo(wx, wy); return; }
       if (team.inReach(v)) examine(v);
       else team.goTo(v.x, v.y, v);
@@ -335,6 +382,16 @@ async function boot() {
   if (authorized) window.sim = { state, camera, modal, debrief, team, evac, rescuers, smur, pompiers }; // accès console (formateur / tests)
   else $('hud-debrief').hidden = true;
 
+  // Retour au menu (tous modes), avec confirmation
+  const quit = $('quit-confirm');
+  document.querySelectorAll('.menu-back').forEach((b) => b.addEventListener('click', () => { quit.hidden = false; $('quit-no').focus(); }));
+  $('quit-no').addEventListener('click', () => { quit.hidden = true; });
+  $('quit-yes').addEventListener('click', () => newGame());
+  quit.addEventListener('click', (e) => { if (e.target === quit) quit.hidden = true; });
+  addEventListener('keydown', (e) => { if (!quit.hidden && e.key === 'Escape') { e.stopImmediatePropagation(); quit.hidden = true; } }, true);
+  $('mpap-fit').addEventListener('click', () => camera.fit(plan.w, plan.h, { rightReserve: MPAP ? 0 : hudWidth() }));
+  $('mpap-debrief').addEventListener('click', () => debrief.open());
+
   addEventListener('resize', () => {
     renderer.resize();
     camera.clamp();
@@ -349,7 +406,7 @@ async function boot() {
     if (e.key === 'c' || e.key === 'C') { camera.x = team.team.x; camera.y = team.team.y; camera.clamp(); }
     // N : nouvelle partie avec une nouvelle disposition
     if (e.key === 'n' || e.key === 'N') newGame();
-    if (e.key === 'f' || e.key === 'F') camera.fit(plan.w, plan.h, { rightReserve: hudWidth() });
+    if (e.key === 'f' || e.key === 'F') camera.fit(plan.w, plan.h, { rightReserve: MPAP ? 0 : hudWidth() });
     if (e.key === 'd' || e.key === 'D') {
       state.ui.debugZones = !state.ui.debugZones;
       $('debug-coords').hidden = !state.ui.debugZones;
@@ -383,7 +440,7 @@ async function boot() {
   });
   if (authorized) window.sim.intro = intro;
   renderer.addOverlay((ctx) => intro.draw(ctx));
-  renderer.addOverlay((ctx) => team.draw(ctx, camera, performance.now()));
+  if (!MPAP) renderer.addOverlay((ctx) => team.draw(ctx, camera, performance.now()));
   renderer.addOverlay((ctx) => amb.draw(ctx));
   addEventListener('keydown', (e) => {
     if ((e.key === 'm' || e.key === 'M') && !e.target.closest?.('input')) sound.setMuted(!sound.muted);
@@ -452,9 +509,9 @@ async function boot() {
   await showBriefing(fillBriefing(scenario, { count: entries.length, stock, player }), {
     onEngage: () => { if (choice.ambience.sound && (choice.ambience.phones || choice.ambience.outside)) sound.unlock(); },
   });
-  state.clock.running = true;
+  state.clock.running = !MPAP;             // MPAP : le temps ne passe pas (pas d'aggravation)
   logEvent(state, 'start', { scenario: scenario.id });
-  intro.start();
+  if (!MPAP) intro.start();
 }
 
 // Nouvelle partie = retour au menu (nouvelle disposition)

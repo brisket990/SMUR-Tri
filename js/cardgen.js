@@ -259,7 +259,7 @@ const THORAX = ['chest', 'ribs', 'heart'];
 const WOUNDS = ['ball', 'graze', 'cut', 'shards', 'exit', 'tear', 'hematoma'];
 const fmt0 = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
-function careSVG(all, care, T, view) {
+function careSVG(all, care, T, view, noTimes = false) {
   const k = T.k;
   const wounds = all.filter((m) => WOUNDS.includes(m.kind));
   const used = new Map();                      // blessure → gestes déjà posés dessus
@@ -273,7 +273,7 @@ function careSVG(all, care, T, view) {
   const place = (m, svg, both = false) => { if (both || !!m.dos === (view === 'dos')) out.push(markSVG({ ...m, kind: '__raw', svg }, T, view)); };
   let tqN = 0;
   for (const c of care) {
-    const t = `T+${fmt0(c.t)}`;
+    const t = noTimes ? null : `T+${fmt0(c.t)}`;
     if (c.action === 'tourniquet') {
       const limbs = wounds.filter((m) => LIMB_TQ[m.region]);
       let w = limbs.find((m) => !tqDone.has(`${m.side}|${limbClass(m.region)}`)) ?? limbs[0];
@@ -306,12 +306,12 @@ function careSVG(all, care, T, view) {
   return out.join('');
 }
 
-function careList(care, labels, x, y0, maxLines, F) {
+function careList(care, labels, x, y0, maxLines, F, noTimes = false) {
   if (!care.length) return '';
   const lines = care.map((c) => {
     const it = labels?.[c.action];
     const name = it ? (it.group === 'position' ? `Position : ${it.label.toLowerCase()}` : it.label) : c.action;
-    return `T+${fmt0(c.t)}  ${name}${c.by ? ` (${c.by})` : ''}`;
+    return `${noTimes ? '• ' : `T+${fmt0(c.t)}  `}${name}${c.by ? ` (${c.by})` : ''}`;
   });
   const shown = lines.length > maxLines ? [...lines.slice(0, maxLines - 1), `… et ${lines.length - maxLines + 1} autre(s)`] : lines;
   return `<text x="${x}" y="${y0}" font-family='${F}' font-weight="700" font-size="17" fill="#8b1a1a">GESTES RÉALISÉS</text>` +
@@ -371,7 +371,7 @@ export function cardSVG(e, opts = {}) {
   }).join('');
   const order = ['burn', 'hematoma', 'tq', 'tear', 'blast', 'shards', 'graze', 'cut', 'blunt', 'fracture', 'ball', 'ear'];
   const drawn = [...marks].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)).map((m) => markSVG(m, T, view)).join('')
-    + careSVG(all, care, T, view);
+    + careSVG(all, care, T, view, opts.noTimes);
   const dosImg = view === 'dos' ? opts.dosImages?.[tplName] : null;
   const panelBack = view === 'dos'
     ? (dosImg ? `<image href="${dosImg}" x="60" y="390" width="354" height="603"/>` : `<rect x="74" y="404" width="326" height="575" fill="#fff"/>`)
@@ -401,7 +401,7 @@ export function cardSVG(e, opts = {}) {
   <g transform="translate(60 390)">${drawn}</g>
   ${badges(care, opts.position, opts.labels, F)}
   ${legend}
-  ${careList(care, opts.labels, 70, 1068, 6, F)}
+  ${careList(care, opts.labels, 70, 1068, 6, F, opts.noTimes)}
   ${blockSVG}
 </svg>`;
 }

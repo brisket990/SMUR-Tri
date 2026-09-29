@@ -178,6 +178,18 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     return { ok: true, message: msg };
   }
 
+  /** MPAP : envoi immédiat au PMA (pas de brancardage simulé) */
+  function sendToPMA(v) {
+    const e = ensure(v);
+    if (e.state === 'pma') return { ok: false, message: 'Déjà au PMA.' };
+    const i = queue.indexOf(v);
+    if (i >= 0) queue.splice(i, 1);
+    Object.assign(e, { state: 'pma', mode: 'mpap', requestedAt: now() });
+    logEvent(state, 'evac', { id: v.id, mode: 'pma' });
+    arrive(v, now());
+    return { ok: true, message: 'Victime envoyée au PMA.' };
+  }
+
   function cancel(v) {
     const i = queue.indexOf(v);
     if (i < 0) return { ok: false, message: 'Aucune demande en attente.' };
@@ -353,7 +365,7 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     }
   }
 
-  return { walk, requestStretcher, prioritize, cancel, update, summary, statusText, draw, pma };
+  return { walk, requestStretcher, prioritize, sendToPMA, cancel, update, summary, statusText, draw, pma };
 }
 
 function roundRect(ctx, x, y, w, h, r) {

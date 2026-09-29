@@ -465,3 +465,30 @@ table.hist code { font-family: ui-monospace, monospace; }
 .pos-ico { width: 52px; height: 25px; flex: none; color: #b8c7d8; }
 .pos-buttons button.on .pos-ico { color: #64b5f6; }
 .pos-label { flex: 1; text-align: left; line-height: 1.2; }
+
+/* ---------- bouton Menu + confirmation ---------- */
+.clock-btns { display: flex; gap: 6px; }
+.quit-confirm { z-index: 80; }
+.quit-box { background: #151922; border: 1px solid #2e3544; border-top: 4px solid #e53935; border-radius: 12px; padding: 20px 24px; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.quit-title { font: 800 20px system-ui, sans-serif; margin-bottom: 8px; }
+.quit-box p { margin: 0 0 16px; line-height: 1.45; color: #cfd6e2; }
+.quit-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+button.danger { background: #c62828; border-color: #c62828; color: #fff; font-weight: 700; }
+/* ---------- mode MPAP ---------- */
+.mpap-bar { position: fixed; top: 12px; right: 12px; left: auto; display: flex; align-items: center; gap: 10px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; z-index: 5; max-width: calc(100vw - 24px); flex-wrap: wrap; }
+.mpap-bar[hidden] { display: none; }
+body.mpap #hud { display: none; }
+.mpap-only { display: none; }
+body.mpap .mpap-only { display: block; }
+body.mpap .care-buttons .qty { display: none; }
+body.mpap #resc-status, body.mpap #resc-post, body.mpap #resc-free, body.mpap #evac-walk, body.mpap #evac-stretcher,
+body.mpap #evac-priority, body.mpap #evac-cancel, body.mpap .care-col h3.resc-title { display: none !important; }
+.mpap-evo { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.mpap-evo button { padding: 6px 2px; font: 700 12.5px system-ui, sans-serif; }
+.mpap-evo button.on { background: #ffd54f; color: #111; border-color: #ffd54f; }
+.mpap-evo-note { margin-top: 6px; }
+.pma-btn { width: 100%; margin-top: 6px; background: #1b5e20; border-color: #2e7d32; color: #fff; font-weight: 700; }
+.pma-btn:disabled { opacity: .5; }
+
+.mpap-only h3 { margin-top: 16px; }

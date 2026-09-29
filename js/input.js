@@ -4,7 +4,7 @@
 
 const DRAG_THRESHOLD = 5; // px : en dessous, c'est un clic
 
-export function attachInput(canvas, camera, cfg, { onMove, onClick }) {
+export function attachInput(canvas, camera, cfg, { onMove, onClick, onGrab }) {
   const mouse = { x: camera.vw / 2, y: camera.vh / 2, inside: false };
   let down = null; // { x, y, lastX, lastY, dragging }
 
@@ -21,10 +21,12 @@ export function attachInput(canvas, camera, cfg, { onMove, onClick }) {
     if (down) {
       if (!down.dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) > DRAG_THRESHOLD) {
         down.dragging = true;
+        down.grab = onGrab?.(down.x, down.y) ?? null;      // une carte sous le pointeur : on la déplace
         canvas.classList.add('dragging');
       }
       if (down.dragging) {
-        camera.pan(e.clientX - down.lastX, e.clientY - down.lastY);
+        if (down.grab) down.grab.move(e.clientX - down.lastX, e.clientY - down.lastY);
+        else camera.pan(e.clientX - down.lastX, e.clientY - down.lastY);
       }
       down.lastX = e.clientX;
       down.lastY = e.clientY;

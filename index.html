@@ -27,7 +27,7 @@
     <div id="hud-col-a" class="hud-col scroll-hint">
     <section class="hud-block">
       <h2>Chrono</h2>
-      <div class="clock-row"><div id="hud-clock" class="clock">00:00</div><button id="hud-debrief" class="hud-btn hud-btn-top" title="Bilan (touche B)">Bilan</button></div>
+      <div class="clock-row"><div id="hud-clock" class="clock">00:00</div><span class="clock-btns"><button id="hud-debrief" class="hud-btn hud-btn-top" title="Bilan (touche B)">Bilan</button><button type="button" class="hud-btn hud-btn-top menu-back" title="Revenir au menu">☰ Menu</button></span></div>
       <div id="hud-reinf" class="muted"></div>
     </section>
     <section class="hud-block">
@@ -48,6 +48,23 @@
     </section>
     </div>
   </aside>
+
+  <!-- Mode MPAP : barre minimale (pas de compteurs) -->
+  <div id="mpap-bar" class="mpap-bar" hidden>
+    <b id="mpap-title"></b><span class="muted small">Cliquer une carte · glisser une carte pour voir dessous · molette : zoom</span>
+    <button type="button" id="mpap-fit" title="Recadrer (F)">⤢ Recadrer</button>
+    <button type="button" id="mpap-debrief" title="Bilan (B)">Bilan</button>
+    <button type="button" class="menu-back" title="Revenir au menu">☰ Menu</button>
+  </div>
+
+  <!-- Confirmation : quitter la partie -->
+  <div id="quit-confirm" class="modal quit-confirm" hidden>
+    <div class="quit-box">
+      <div class="quit-title">Quitter la partie ?</div>
+      <p>Vous allez revenir au menu principal. La partie en cours sera perdue (le bilan n'est pas enregistré si vous ne l'avez pas ouvert).</p>
+      <div class="quit-actions"><button type="button" id="quit-no">Continuer la partie</button><button type="button" id="quit-yes" class="danger">Quitter et revenir au menu</button></div>
+    </div>
+  </div>
 
   <!-- Coordonnées en mode debug -->
   <div id="debug-coords" hidden></div>
@@ -99,13 +116,19 @@
           <div class="care-col scroll-hint">
           <h3>Réalisés</h3>
           <ul id="care-done" class="care-done"></ul>
-          <h3>Secouriste</h3>
+          <h3 class="resc-title">Secouriste</h3>
           <div id="resc-status" class="evac-status"></div>
           <div class="evac-buttons">
             <button id="resc-post" type="button">👤 Poster un secouriste</button>
             <button id="resc-free" type="button" class="muted-btn" hidden>Rappeler le secouriste</button>
           </div>
+          <div class="mpap-only">
+            <h3>Évolution dans le temps</h3>
+            <div id="mpap-evo" class="mpap-evo"></div>
+            <div id="mpap-evo-note" class="muted small"></div>
+          </div>
           <h3>Évacuation</h3>
+          <button id="evac-pma" type="button" class="mpap-only pma-btn">🏥 Envoyer au PMA</button>
           <div id="evac-status" class="evac-status"></div>
           <div class="evac-buttons">
             <button id="evac-walk" type="button">🚶 À pied vers le PMA</button>
