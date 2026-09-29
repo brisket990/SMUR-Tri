@@ -75,7 +75,7 @@ export function showMenu(scenarios) {
   function preview() {
     const sc = current();
     const random = !sc;
-    countWrap.hidden = random;
+    countWrap.hidden = random || !!sc?.mpapOf;      // MPAP : toutes les fiches, pas de choix du nombre
     desc.textContent = random
       ? 'Le scénario et le nombre de victimes seront tirés au sort. Vous les découvrirez au briefing.'
       : sc.subtitle ?? '';
@@ -85,7 +85,7 @@ export function showMenu(scenarios) {
     }
     const n = Number(range.value);
     out.textContent = n;
-    stock.textContent = sc.mpapOf ? 'MPAP : matériel illimité, pas de chrono, pas de déplacement. Évolution des victimes à la demande (T+5, T+10…).'
+    stock.textContent = sc.mpapOf ? `MPAP : les ${sc.public?.count ?? 150} fiches + une cinquantaine de décédés à l'entrée, survivants cachés sous les corps. Matériel illimité, pas de chrono, pas de déplacement. Évolution à la demande (T+5, T+10…).`
       : 'Sac de départ : ' + describeStock(scaledStock(n, sc).items);
   }
 

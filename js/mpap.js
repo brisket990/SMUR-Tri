@@ -10,7 +10,7 @@
 const RANK = { BLACK: 0, RED: 1, YELLOW: 2, GREEN: 3 };
 
 export function placeMPAP(entries, zones, plan, card, rng, scenario, avoid = []) {
-  const M = { entrance: scenario.team?.start ?? [0.5, 0.9], hiddenShare: 0.1, jitter: 0.5, deadSpacing: 0.3, spacing: 0.95, deadBand: 0.05, ...(scenario.mpap ?? {}) };
+  const M = { entrance: scenario.team?.start ?? [0.5, 0.9], hiddenShare: 0.1, jitter: 0.5, deadSpacing: 0.28, spacing: 0.95, deadBand: 0.09, ...(scenario.mpap ?? {}) };
   const E = { x: M.entrance[0] * plan.w, y: M.entrance[1] * plan.h };
 
   // candidats : points tirés dans toutes les zones (au prorata de la surface), hors zones interdites
@@ -38,7 +38,7 @@ export function placeMPAP(entries, zones, plan, card, rng, scenario, avoid = [])
 
   // cachés : une part des survivants (UA / UR / impliqués), sous un corps
   const living = order.filter((o) => (RANK[entries[o.i].truth?.triage] ?? 2) >= 1);
-  const nHidden = Math.max(2, Math.round(entries.length * M.hiddenShare));
+  const nHidden = Math.max(2, Math.round(entries.filter((e) => !e.extra).length * M.hiddenShare));
   const hidden = new Set();
   for (const o of [...living].sort(() => rng.next() - 0.5).slice(0, nHidden)) hidden.add(o.i);
 
@@ -89,4 +89,39 @@ export function placeMPAP(entries, zones, plan, card, rng, scenario, avoid = [])
     };
   }
   return out;
+}
+
+// ============================================================
+//  MPAP : une cinquantaine de décédés supplémentaires (inventés)
+// ============================================================
+//  Ils s'ajoutent aux 150 fiches et s'entassent à l'entrée. Fiches BC-151, BC-152…
+//  Aucune donnée réelle : textes tirés au hasard parmi des formulations types.
+const DEAD_MECH = ["Tir d'AK-47 en rafale", "Tir d'AK-47 à bout portant", "Tir d'AK-47 dans la fosse", 'Explosion kamikaze (proche épicentre)',
+  "Explosion kamikaze", "Tir d'AK-47 en fuyant vers la sortie", 'Tirs croisés près de l\'entrée', 'Grenade'];
+const DEAD_PRES = ['Inerte, aréactif, décédé sur place.', 'Inerte, aréactif, lésions incompatibles avec la vie.',
+  'Inerte, aréactif, aucun mouvement ventilatoire.', 'En arrêt cardio-respiratoire, rigidité débutante.', 'Inerte, face contre le sol, aréactif.'];
+const DEAD_LES = [
+  ['Plaie balistique crânienne transfixiante.', 'ball:head:C:x2'],
+  ['Plaies balistiques multiples du thorax.', 'ball:chest:R ball:chest:L ball:chest:C'],
+  ['Plaie balistique médiothoracique (cœur / gros vaisseaux).', 'ball:heart'],
+  ['Plaie balistique cervicale avec section vasculaire.', 'ball:neck:C hematoma:neck:L'],
+  ['Délabrement thoraco-abdominal par blast.', 'tear:abdomen:C blast:body blast:body:dos'],
+  ['Poly-criblage par éclats, brûlures étendues.', 'blast:body:big burn:body:C:big blast:body:dos'],
+  ['Plaies balistiques multiples thorax et abdomen.', 'ball:chest:L ball:abdomen:C ball:abdomen:R ball:chest:R:dos'],
+  ['Plaie balistique crânio-faciale destructrice.', 'ball:face:C:x2 ball:head:C'],
+  ['Plaies balistiques du dos et du thorax (tir en fuyant).', 'ball:chest:R:dos ball:chest:L:dos exit:chest:L'],
+];
+export function makeExtraDead(n, rng, firstNum = 151) {
+  const pick = (a) => a[Math.floor(rng.next() * a.length)];
+  return Array.from({ length: n }, (_, i) => {
+    const [lesion, injuries] = pick(DEAD_LES);
+    const sex = rng.next() < 0.5 ? 'Homme' : 'Femme';
+    return {
+      id: `BC-${firstNum + i}`, extra: true, zone: null,
+      clinical: { sex, age: 18 + Math.floor(rng.next() * 45), mechanism: pick(DEAD_MECH), pres: pick(DEAD_PRES),
+        vent: 'FR : 0/min - Apnée.', circ: 'FC : 0 bpm - PA : imprenable.', neuro: 'GCS 3 (E1 V1 M1). Mydriase bilatérale aréactive.', lesion },
+      truth: { triage: 'BLACK', accept: [], limit: false, why: 'Décès constaté : aucune ressource à engager.', note: '' },
+      profile: 'dead', actions: {}, injuries,
+    };
+  });
 }

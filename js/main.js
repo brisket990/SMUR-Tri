@@ -6,7 +6,7 @@ import { CONFIG, STATUS } from './config.js';
 import { createRng } from './rng.js';
 import { loadImage, fetchJSON, makeThumb, mapPool, placeholderCard, placeholderPlan } from './assets.js';
 import { placeVictims } from './placement.js';
-import { placeMPAP } from './mpap.js';
+import { placeMPAP, makeExtraDead } from './mpap.js';
 import { createVictim, createGameState, assignTriage, markSeen, logEvent } from './state.js';
 import { updateSim } from './sim.js';
 import { Camera } from './camera.js';
@@ -101,7 +101,13 @@ async function boot() {
     const sid = scenario.dataId ?? scenario.id;
     const manifest = await openJSON(access.key, `${scenario.base}victims.enc`, `${sid}/victims`);
     ({ profiles } = await openJSON(access.key, `${scenario.base}profiles.enc`, `${sid}/profiles`));
-    entries = selectVictims(manifest.victims, count, rng);
+    // MPAP : toutes les fiches, plus une cinquantaine de décédés entassés à l'entrée
+    if (MPAP) {
+      entries = selectVictims(manifest.victims, manifest.victims.length, rng);
+      const n = scenario.mpap?.extraDead ?? 50;
+      const last = Math.max(...manifest.victims.map((v) => parseInt(v.id.replace(/\D/g, ''), 10) || 0));
+      entries = entries.concat(makeExtraDead(n, rng, last + 1));
+    } else entries = selectVictims(manifest.victims, count, rng);
   } else {
     // non autorisé : de simples identifiants, les données restent chiffrées
     entries = rng.shuffle(scenario.public.ids.slice()).slice(0, count).map((id) => ({ id }));
@@ -219,11 +225,12 @@ async function boot() {
   if (MPAP) for (const k of Object.keys(state.inventory)) state.inventory[k] = Infinity;   // matériel illimité
   state.seed = seed;
   state.count = entries.length;
+  const realCount = entries.filter((e) => !e.extra).length;
   state.scenario = { id: scenario.id, name: scenario.name, random: !choice.scenarioId };
-  state.gameNumber = gameNumber(scenario, seed, entries.length);
+  state.gameNumber = gameNumber(scenario, seed, realCount);
   state.startedAt = Date.now();
   state.gameId = `${state.gameNumber}@${state.startedAt}`;
-  $('hud-seed').innerHTML = `${choice.name ? esc(choice.name) + '<br>' : ''}${esc(scenario.name)} · ${entries.length} victimes<br>Partie n° <b>${state.gameNumber}</b>`;
+  $('hud-seed').innerHTML = `${choice.name ? esc(choice.name) + '<br>' : ''}${esc(scenario.name)} · ${entries.length} victimes${realCount !== entries.length ? ` (dont ${entries.length - realCount} décédés ajoutés)` : ''}<br>Partie n° <b>${state.gameNumber}</b>`;
   $('hud-seed').title = 'Saisir ce numéro dans le menu (« N° de partie ») pour rejouer exactement cette partie';
 
   // 9. Affichage + interactions
