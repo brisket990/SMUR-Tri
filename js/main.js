@@ -35,6 +35,7 @@ import { drawZoneLight } from './orders.js';
 import { selectVictims } from './selection.js';
 import { scaledStock } from './stock.js';
 import { unlock, openJSON, openImageURL } from './secure.js';
+import { activeCorrections, applyCorrections } from './corrections.js';
 import { generatedCardURL } from './cardgen.js';
 
 const $ = (id) => document.getElementById(id);
@@ -101,6 +102,9 @@ async function boot() {
     const sid = scenario.dataId ?? scenario.id;
     const manifest = await openJSON(access.key, `${scenario.base}victims.enc`, `${sid}/victims`);
     ({ profiles } = await openJSON(access.key, `${scenario.base}profiles.enc`, `${sid}/profiles`));
+    // corrections faites dans l'éditeur (⚙ Options) : brouillon de ce navigateur, sinon version publiée
+    const corr = await activeCorrections(access.key, scenario.base, sid);
+    ({ victims: manifest.victims, profiles } = applyCorrections(manifest.victims, profiles, corr));
     // MPAP : toutes les fiches, plus une cinquantaine de décédés entassés à l'entrée
     if (MPAP) {
       entries = selectVictims(manifest.victims, manifest.victims.length, rng);

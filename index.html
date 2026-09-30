@@ -169,6 +169,18 @@
       <div class="menu-fields">
         <h1>Simulation de tri</h1>
         <p class="muted">Afflux massif de victimes · premier tour de catégorisation</p>
+        <!-- Deux modes : Jeu (terrain) et MPAP (projection) -->
+        <div id="mode-switch" class="mode-switch" role="tablist" aria-label="Mode">
+          <span class="mode-glider" aria-hidden="true"></span>
+          <button type="button" role="tab" class="mode-tab" data-mode="jeu" aria-selected="true">
+            <svg class="mode-ico" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="17" /><circle cx="24" cy="24" r="7" /><path d="M24 2v10M24 36v10M2 24h10M36 24h10" /></svg>
+            <span class="mode-txt"><b>Jeu</b><small>Terrain · chrono · équipes</small></span>
+          </button>
+          <button type="button" role="tab" class="mode-tab" data-mode="mpap" aria-selected="false">
+            <svg class="mode-ico" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="7" width="40" height="26" rx="3" /><path d="M24 33v7M14 42h20" /><path d="M12 26l7-8 6 5 9-10" /></svg>
+            <span class="mode-txt"><b>MPAP</b><small>Projection · en groupe</small></span>
+          </button>
+        </div>
         <label>Nom / équipe
           <input id="menu-name" maxlength="40" placeholder="ex. Équipe SMUR 1" />
         </label>
@@ -186,16 +198,35 @@
         <label class="menu-game">N° de partie <span class="muted">(facultatif, pour rejouer une partie)</span>
           <input id="menu-game" inputmode="numeric" placeholder="ex. BAT-138975-40 · vide = nouvelle partie au hasard" />
         </label>
-        <fieldset class="menu-options">
-          <legend>Ambiance</legend>
-          <label><input type="checkbox" id="opt-bubbles" /> Bulles : appels à l'aide, cris, pleurs</label>
-          <label><input type="checkbox" id="opt-phones" /> Téléphones qui sonnent</label>
-          <label><input type="checkbox" id="opt-sound" /> Sons — touche M en jeu pour couper</label>
-          <label><input type="checkbox" id="opt-outside" /> Sirènes des renforts et radio</label>
-        </fieldset>
         <div id="menu-stock" class="muted small"></div>
         <button type="submit" class="menu-start">Commencer l'exercice</button>
-        <button type="button" id="menu-history" class="muted-btn menu-history">📋 Historique des parties</button>
+        <div class="menu-foot">
+          <button type="button" id="menu-options-btn" class="muted-btn">⚙ Options</button>
+          <button type="button" id="menu-history" class="muted-btn">📋 Historique des parties</button>
+        </div>
+      </div>
+
+      <!-- Options (mémorisées dans ce navigateur) -->
+      <div id="menu-opts" class="opts" hidden>
+        <div class="opts-card" role="dialog" aria-modal="true" aria-labelledby="opts-title">
+          <header><h2 id="opts-title">⚙ Options</h2><button type="button" class="opts-close" aria-label="Fermer">✕</button></header>
+          <section>
+            <h3>Son et ambiance</h3>
+            <label class="sw"><input type="checkbox" id="opt-sound" /><span class="sw-track"></span><span>Sons<small>Interrupteur général · touche M en jeu pour couper</small></span></label>
+            <label class="sw sub"><input type="checkbox" id="opt-outside" /><span class="sw-track"></span><span>Sirènes des renforts et radio</span></label>
+            <label class="sw"><input type="checkbox" id="opt-phones" /><span class="sw-track"></span><span>Téléphones qui sonnent</span></label>
+            <label class="sw"><input type="checkbox" id="opt-bubbles" /><span class="sw-track"></span><span>Bulles<small>Appels à l'aide, cris, pleurs</small></span></label>
+          </section>
+          <section>
+            <h3>Fiches victimes <span class="opts-tag">formateurs</span></h3>
+            <button type="button" id="open-editor" class="opts-editor">
+              <span class="oe-ico" aria-hidden="true">✎</span>
+              <span><b>Modifier les fiches victimes</b><small>Texte, tri attendu, blessures, évolution, effet des gestes · code d'accès requis</small></span>
+              <span aria-hidden="true">›</span>
+            </button>
+          </section>
+          <button type="button" class="opts-ok">Fermer</button>
+        </div>
       </div>
     </form>
   </div>
@@ -227,6 +258,9 @@
   </div>
 
   <!-- Historique des parties -->
+  <!-- Éditeur des fiches victimes (menu ⚙ Options) -->
+  <div id="editor" class="editor" hidden></div>
+
   <div id="history" class="modal" hidden>
     <div class="modal-inner history-inner">
       <header>

@@ -101,7 +101,7 @@ export const CONFIG = {
   ambience: {
     defaults: { bubbles: true, phones: true, sound: true, outside: true },
     volume: 0.6,
-    //  Vos sonneries MP3 : déposez-les dans jeu/sons/ sous les noms
+    //  Vos sonneries MP3 : déposez-les dans jeu/SMUR-Tri/sons/ sous les noms
     //  sonnerie-01.mp3, sonnerie-02.mp3, sonnerie-03.mp3… (numérotation continue,
     //  jusqu'à 30). Elles sont détectées automatiquement.
     ringtoneDir: 'sons/',

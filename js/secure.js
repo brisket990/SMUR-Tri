@@ -74,3 +74,17 @@ export async function openImageURL(key, url, id) {
   const bytes = await open(key, await fetchSealed(url), id);
   return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
 }
+
+/** Chiffre (IV aléatoire + AES-256-GCM) : même format que outils/chiffrer.py. */
+export async function seal(key, bytes, aad) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ad = typeof aad === 'string' ? enc(aad) : aad;
+  let ct;
+  if ((await engine()) === 'webcrypto') {
+    const k = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt']);
+    ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: ad }, k, bytes));
+  } else ct = noble.gcm(key, iv, ad).encrypt(bytes);
+  const out = new Uint8Array(12 + ct.length);
+  out.set(iv); out.set(ct, 12);
+  return out;
+}

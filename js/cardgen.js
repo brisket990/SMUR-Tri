@@ -4,7 +4,7 @@
 //  Même gabarit que les fiches PNG (1016 × 1489) : en-tête, identité,
 //  mécanisme, silhouette avec les blessures, ABCDE, cartouche de tri
 //  (aux mêmes positions : les zones cliquables restent alignées).
-//  Fond : VOS fiches vierges (jeu/img/fiches/modele-homme|femme|enfant|bebe.jpg), choisies selon l'âge et le sexe ;
+//  Fond : VOS fiches vierges (jeu/SMUR-Tri/img/fiches/modele-homme|femme|enfant|bebe.jpg), choisies selon l'âge et le sexe ;
 //  à défaut, fiche entièrement dessinée.
 //  Blessures : tableau fait main (outils/blessures.py → victims[].injuries), à défaut lecture du bilan lésionnel :
 //  région (cuisse, thorax, avant-bras…), côté (droit / gauche / bilatéral),
@@ -81,7 +81,7 @@ function bodySVG(sex) {
 }
 
 // ---------- modèles de fiche vierge et points d'ancrage ----------
-//  Vos fiches vierges (jeu/img/fiches/modele-*.jpg, 1016 × 1489) servent de fond.
+//  Vos fiches vierges (jeu/SMUR-Tri/img/fiches/modele-*.jpg, 1016 × 1489) servent de fond.
 //  Points relevés sur chaque silhouette, dans le cadre silhouette (posé en x = 60, y = 390
 //  sur la fiche), côté DROIT du patient (à gauche du dessin) ; le côté gauche est le miroir
 //  autour de l'axe. k = taille des symboles.

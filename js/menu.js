@@ -54,11 +54,44 @@ export function showMenu(scenarios) {
   const stock = $('menu-stock');
   const game = $('menu-game');
 
-  // ---------- liste des scénarios ----------
-  select.innerHTML = scenarios.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')
-    + (CONFIG.randomMode ? `<option value="${RANDOM}">🎲 Hasard total — scénario et victimes surprises</option>` : '');
-  const saved = store.get('smur.scenario');
-  if (saved && [...select.options].some((o) => o.value === saved)) select.value = saved;
+  // ---------- onglets Jeu / MPAP : chacun sa liste de scénarios ----------
+  const card = $('menu-form');
+  const fields = menu.querySelector('.menu-fields');
+  const tabs = [...menu.querySelectorAll('.mode-tab')];
+  const startBtn = menu.querySelector('.menu-start');
+  const isMpap = (s) => !!s.mpapOf;
+  const hasMpap = scenarios.some(isMpap);
+  $('mode-switch').hidden = !hasMpap;
+  let mode = hasMpap && store.get('smur.mode') === 'mpap' ? 'mpap' : 'jeu';
+
+  function fillSelect() {
+    const list = scenarios.filter((s) => isMpap(s) === (mode === 'mpap'));
+    select.innerHTML = list.map((s) => `<option value="${s.id}">${mode === 'mpap' ? s.name.replace(/\s*\(MPAP\)\s*$/, '') : s.name}</option>`).join('')
+      + (mode === 'jeu' && CONFIG.randomMode ? `<option value="${RANDOM}">🎲 Hasard total — scénario et victimes surprises</option>` : '');
+    const saved = store.get(`smur.scenario.${mode}`) ?? store.get('smur.scenario');
+    if (saved && [...select.options].some((o) => o.value === saved)) select.value = saved;
+  }
+  function setMode(m, { animate = true } = {}) {
+    mode = m;
+    card.dataset.mode = m;
+    tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.mode === m)));
+    startBtn.textContent = m === 'mpap' ? 'Lancer la projection' : 'Commencer l\'exercice';
+    fillSelect();
+    if (animate) { fields.classList.remove('swap'); void fields.offsetWidth; fields.classList.add('swap'); }
+  }
+  tabs.forEach((t) => t.addEventListener('click', () => {
+    if (t.dataset.mode === mode) return;
+    setMode(t.dataset.mode);
+    store.set('smur.mode', mode);
+    setupRange(); preview();
+  }));
+  // flèches gauche / droite sur les onglets
+  $('mode-switch').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const t = tabs.find((x) => x.dataset.mode !== mode);
+    t.click(); t.focus();
+  });
+  setMode(mode, { animate: false });
   name.value = store.get('smur.name') ?? '';
 
   const current = () => scenarios.find((s) => s.id === select.value) ?? null;
@@ -101,7 +134,10 @@ export function showMenu(scenarios) {
     if (g?.code) {
       const sc = scenarios.find((s) => s.code.toUpperCase() === g.code);
       if (!sc) game.classList.add('invalid');
-      else if (select.value !== sc.id) { select.value = sc.id; setupRange(); }
+      else if (select.value !== sc.id) {
+        if (isMpap(sc) !== (mode === 'mpap')) setMode(isMpap(sc) ? 'mpap' : 'jeu');   // n° d'une partie de l'autre mode
+        select.value = sc.id; setupRange();
+      }
     }
     if (g?.count && current()) {
       const r = victimRange(current());
@@ -145,6 +181,24 @@ export function showMenu(scenarios) {
   };
   opts.sound.addEventListener('change', syncSound);
   syncSound();
+  // enregistrées dès qu'on les change (pas besoin de lancer une partie)
+  for (const [k, box] of Object.entries(opts)) box.addEventListener('change', () => store.set(`smur.opt.${k}`, box.checked ? '1' : '0'));
+
+  // ---------- panneau Options ----------
+  const optsBox = $('menu-opts');
+  const optsBtn = $('menu-options-btn');
+  const closeOpts = () => { optsBox.hidden = true; optsBtn.focus(); };
+  optsBtn.onclick = () => { optsBox.hidden = false; optsBox.querySelector('.opts-ok').focus(); };
+  optsBox.onclick = (e) => { if (e.target === optsBox || e.target.closest('.opts-close, .opts-ok')) closeOpts(); };
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !optsBox.hidden && document.getElementById('editor').hidden) { e.stopPropagation(); closeOpts(); }
+  });
+  // éditeur des fiches victimes (chargé à la demande)
+  $('open-editor').onclick = async () => {
+    if (code.value) session.set('smur.code', code.value);
+    const { openEditor } = await import('./editor.js');
+    openEditor({ scenarios });
+  };
 
   menu.hidden = false;
   name.focus();
@@ -157,6 +211,9 @@ export function showMenu(scenarios) {
       const sc = current();
       store.set('smur.name', name.value.trim());
       store.set('smur.scenario', select.value);
+      store.set(`smur.scenario.${mode}`, select.value);
+      store.set('smur.mode', mode);
+      optsBox.hidden = true;
       if (sc) store.set(`smur.count.${sc.id}`, range.value);
       if (code.value) session.set('smur.code', code.value);
       for (const [k, box] of Object.entries(opts)) store.set(`smur.opt.${k}`, box.checked ? '1' : '0');
