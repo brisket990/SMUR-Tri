@@ -711,3 +711,8 @@ body.editor-open { overflow: hidden; }
 .linkish { background: none; border: 0; padding: 0; color: #7fb2ff; cursor: pointer; font: inherit; text-decoration: underline; }
 .ed-steps.small { font-size: 13px; gap: 6px; }
 .ed-dlg { max-height: calc(100vh - 32px); overflow-y: auto; }
+
+.death-contact { display: grid; gap: 6px; max-width: 520px; margin: 18px auto 6px; padding: 14px 18px; border-radius: 12px; text-align: center;
+  background: rgba(0,0,0,.45); border: 1px solid rgba(255,205,210,.35); color: #ffe4e6; font-size: 15px; line-height: 1.45; }
+.death-contact b { color: #fff; font-size: 16px; }
+.death-contact strong { color: #fff; }
