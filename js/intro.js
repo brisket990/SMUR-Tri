@@ -9,7 +9,7 @@
 
 import { logEvent } from './state.js';
 
-export function createIntro(state, scenario, plan, { team, pma, camera, amb, backImage, voice = true, count }) {
+export function createIntro(state, scenario, plan, { team, pma, cri = null, camera, amb, backImage, voice = true, count }) {
   const C = { enabled: true, walkers: [45, 55], speedMps: 3.2, text: 'Si vous pouvez marcher, venez vers moi !', ...(scenario.intro ?? {}) };
   const walkers = [];
   let started = false;
@@ -72,7 +72,7 @@ export function createIntro(state, scenario, plan, { team, pma, camera, amb, bac
         if (w.age >= w.wait) w.phase = 'toTeam';
         continue;
       }
-      const [tx, ty] = w.phase === 'toTeam' ? [w.gx, w.gy] : [pma.x, pma.y];
+      const [tx, ty] = w.phase === 'toTeam' ? [w.gx, w.gy] : [(cri ?? pma).x, (cri ?? pma).y];
       const d = Math.hypot(tx - w.x, ty - w.y);
       const step = w.spd * dt;
       if (d <= step) {
@@ -83,7 +83,7 @@ export function createIntro(state, scenario, plan, { team, pma, camera, amb, bac
         w.x += ((tx - w.x) / d) * step; w.y += ((ty - w.y) / d) * step;
       }
       if (w.phase === 'toPMA') {
-        const left = Math.hypot(pma.x - w.x, pma.y - w.y);
+        const left = Math.hypot((cri ?? pma).x - w.x, (cri ?? pma).y - w.y);
         w.alpha = Math.min(1, left / (4 * pxPerM));    // s'efface en arrivant au PMA
       }
       if (w.phase === 'gone') walkers.splice(i, 1);

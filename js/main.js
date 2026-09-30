@@ -202,10 +202,10 @@ async function boot() {
   // 8. Placement + état
   // pas de carte autour du PMA / de la sortie (trompeur avec l'icône PMA)
   const pxPerM = plan.w / (scenario.scale?.planWidthMeters ?? 50);
-  const avoid = scenario.evacuation?.pma
-    ? [{ x: scenario.evacuation.pma[0] * plan.w, y: scenario.evacuation.pma[1] * plan.h, r: (scenario.evacuation.pmaClearMeters ?? 7) * pxPerM }] : [];
+  const avoid = [scenario.evacuation?.pma, scenario.evacuation?.walkTo].filter(Boolean)
+    .map((p) => ({ x: p[0] * plan.w, y: p[1] * plan.h, r: (scenario.evacuation.pmaClearMeters ?? 7) * pxPerM }));
   const placements = MPAP && authorized
-    ? placeMPAP(entries, zones, plan, card, rng, scenario, [{ ...avoid[0], r: (scenario.mpap?.pmaClearMeters ?? 4) * pxPerM }].filter((a) => a.x != null))
+    ? placeMPAP(entries, zones, plan, card, rng, scenario, avoid.map((a) => ({ ...a, r: (scenario.mpap?.pmaClearMeters ?? 4) * pxPerM })))
     : placeVictims(entries, zones, plan, card, CONFIG, rng, avoid);
   const zoneLabel = Object.fromEntries(zones.map((z) => [z.id, z.label]));
   const victims = entries.map((e, i) => {
@@ -440,13 +440,14 @@ async function boot() {
   ];
   const outside = choice.ambience.outside ? createOutside(state, sound, arrivals) : null;
   renderer.addOverlay((ctx) => evac.draw(ctx, camera));
+  if (evac.cri?.separate) $('evac-walk').textContent = `🚶 À pied vers le ${evac.cri.label.toLowerCase()}`;
   renderer.addOverlay((ctx) => rescuers.draw(ctx, camera));
   renderer.addOverlay((ctx) => smur.draw(ctx, camera));
   renderer.addOverlay((ctx) => pompiers.draw(ctx, camera));
   renderer.addOverlay((ctx) => drawZoneLight(ctx, camera, scenario, plan, performance.now() / 1000));
   // animation d'arrivée : appel des valides
   const intro = createIntro(state, scenario, plan, {
-    team, pma: evac.pma, camera, amb, backImage: backThumb, count: entries.length,
+    team, pma: evac.pma, cri: evac.cri, camera, amb, backImage: backThumb, count: entries.length,
     voice: choice.ambience.sound,
   });
   if (authorized) window.sim.intro = intro;

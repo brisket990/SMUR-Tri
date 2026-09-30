@@ -42,6 +42,11 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
   const E = scenario.evacuation ?? {};
   const pxPerM = plan.w / (scenario.scale?.planWidthMeters ?? 50);
   const pma = { x: (E.pma?.[0] ?? 0.5) * plan.w, y: (E.pma?.[1] ?? 0.95) * plan.h, label: E.pmaLabel ?? 'PMA' };
+  // point de regroupement des impliqués (victimes à pied) : sinon, le PMA
+  const cri = E.walkTo
+    ? { x: E.walkTo[0] * plan.w, y: E.walkTo[1] * plan.h, label: E.walkLabel ?? 'Regroupement des impliqués', separate: true }
+    : pma;
+  const destOf = (v) => (v.evac?.mode === 'walk' ? cri : pma);
   const speed = {
     walk: (E.walkSpeedMps ?? 0.8) * pxPerM,
     stretcher: (E.stretcherSpeedMps ?? 0.9) * pxPerM,
@@ -59,7 +64,7 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     return { id: `${g.prefix} ${counters[g.prefix]}`, org: g.org, color: g.color ?? '#e53935', arriveAt: g.atMin * 60000, job: null, x: pma.x, y: pma.y, trips: 0, items: g.items ?? null };
   }));
   const queue = [];     // victimes en attente de brancardage (ordre des demandes)
-  state.evac = { teams, queue, pma };
+  state.evac = { teams, queue, pma, cri };
 
   const now = () => state.clock.elapsedMs;
   const travelMs = (x1, y1, x2, y2, v) => (Math.hypot(x2 - x1, y2 - y1) / v) * 1000;
@@ -86,9 +91,9 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     const t = now();
     Object.assign(v.evac, {
       state: 'walking', mode: 'walk', by, requestedAt: t, startAt: t, from: { x: v.x, y: v.y },
-      arriveAt: t + travelMs(v.x, v.y, pma.x, pma.y, speed.walk),
+      arriveAt: t + travelMs(v.x, v.y, cri.x, cri.y, speed.walk),
     });
-    return { ok: true, message: 'Victime orientée à pied vers le PMA.' };
+    return { ok: true, message: `Victime orientée à pied vers ${cri.separate ? 'le ' + cri.label.toLowerCase() : 'le PMA'}.` };
   }
 
   /** Demande de brancardage (mise en file d'attente) */
@@ -202,7 +207,8 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
   function arrive(v, t) {
     v.evac.state = 'pma';
     v.evac.arrivedAt = t;
-    v.x = pma.x; v.y = pma.y;
+    const d = destOf(v);
+    v.x = d.x; v.y = d.y;
     // prise en charge médicale au PMA : l'aggravation s'arrête
     if (v.status !== 'DEAD' && !v.evo.frozen) { v.evo.frozen = true; v.evo.frozenAt = t; v.evo.byPMA = true; }
     logEvent(state, 'pma', { id: v.id, mode: v.evac.mode, team: v.evac.team ?? null });
@@ -219,8 +225,8 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
       if (t >= e.arriveAt) arrive(v, e.arriveAt);
       else {
         const k = (t - e.startAt) / (e.arriveAt - e.startAt);
-        v.x = e.from.x + (pma.x - e.from.x) * k;
-        v.y = e.from.y + (pma.y - e.from.y) * k;
+        v.x = e.from.x + (cri.x - e.from.x) * k;
+        v.y = e.from.y + (cri.y - e.from.y) * k;
       }
     }
 
@@ -300,8 +306,8 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
       case 'pickup': return `${e.priority ? '⚡ ' : ''}${e.team} (${e.org}) en route vers la victime${fat(e)}`;
       case 'loading': return `${e.team} : conditionnement sur brancard${fat(e)}`;
       case 'transport': return `${e.team} : transport vers le PMA${fat(e)}`;
-      case 'walking': return 'Rejoint le PMA à pied';
-      case 'pma': return 'Au PMA';
+      case 'walking': return cri.separate ? `Rejoint à pied : ${cri.label}` : 'Rejoint le PMA à pied';
+      case 'pma': return e.mode === 'walk' && cri.separate ? `Arrivée : ${cri.label}` : 'Au PMA';
       default: return 'Sur place';
     }
   }
@@ -324,8 +330,22 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     ctx.font = '800 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#c8f7c5';
-    ctx.fillText(`${pma.label} · ${s.atPMA}`, px, py + 28);
+    ctx.fillText(`${pma.label} · ${cri.separate ? state.victims.filter((v) => v.evac?.state === 'pma' && v.evac.mode !== 'walk').length : s.atPMA}`, px, py + 28);
     ctx.restore();
+    // point de regroupement des impliqués (s'il est distinct du PMA)
+    if (cri.separate) {
+      const [cx, cy] = camera.worldToScreen(cri.x, cri.y);
+      const n = state.victims.filter((v) => v.evac?.state === 'pma' && v.evac.mode === 'walk').length;
+      ctx.save();
+      ctx.fillStyle = '#1565c0'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#fff';                        // pictogramme : deux personnes
+      for (const dx of [-5, 5]) { ctx.beginPath(); ctx.arc(cx + dx, cy - 5, 3.2, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(cx + dx - 3.5, cy - 1, 7, 9); }
+      ctx.font = '800 12px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#bbdefb';
+      ctx.fillText(`${cri.label} · ${n}`, cx, cy + 30);
+      ctx.restore();
+    }
 
     // victimes en attente de brancardage : sablier
     for (const v of queue) {
@@ -365,7 +385,7 @@ export function createEvacuation(state, scenario, plan, { onSupply } = {}) {
     }
   }
 
-  return { walk, requestStretcher, prioritize, sendToPMA, cancel, update, summary, statusText, draw, pma };
+  return { walk, requestStretcher, prioritize, sendToPMA, cancel, update, summary, statusText, draw, pma, cri };
 }
 
 function roundRect(ctx, x, y, w, h, r) {

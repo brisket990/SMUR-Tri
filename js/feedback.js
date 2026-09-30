@@ -166,7 +166,7 @@ export function analyzeVictim(v, state) {
     const walker = walkableAtStart(v);
     // ce qui a été fait
     for (const l of logs) {
-      if (l.type === 'evac' && l.mode === 'walk') did.push({ t: l.t, text: (l.ok ? 'Orientée à pied vers le PMA' : 'Envoi à pied tenté') + (l.by ? ` par ${l.by}` : ''), note: l.by ? 'renfort' : l.ok ? '' : 'ne pouvait pas marcher', cls: l.ok || l.by ? '' : 'k-useless' });
+      if (l.type === 'evac' && l.mode === 'walk') did.push({ t: l.t, text: (l.ok ? (state.evac?.cri?.separate ? 'Orientée à pied vers le regroupement des impliqués' : 'Orientée à pied vers le PMA') : 'Envoi à pied tenté') + (l.by ? ` par ${l.by}` : ''), note: l.by ? 'renfort' : l.ok ? '' : 'ne pouvait pas marcher', cls: l.ok || l.by ? '' : 'k-useless' });
       if (l.type === 'evac' && l.mode === 'stretcher') did.push({ t: l.t, text: `Brancardage demandé${l.by ? ` par ${l.by}` : ''}`, note: l.by ? 'renfort' : '' });
       if (l.type === 'evac-cancel') did.push({ t: l.t, text: 'Demande de brancardage annulée' });
       if (l.type === 'evac-priority') did.push({ t: l.t, text: '⚡ Brancardage passé en priorité' });
@@ -181,7 +181,7 @@ export function analyzeVictim(v, state) {
     // ce qu'il fallait faire
     if (initialUD) should.push('Évacuation : laisser sur place, ne pas mobiliser de brancard');
     else if (v.truth.triage === 'RED') should.push('Évacuation : brancardage <b>prioritaire</b> vers le PMA');
-    else if (walker) should.push('Évacuation : <b>à pied</b> vers le PMA (pas de brancard)');
+    else if (walker) should.push(`Évacuation : <b>à pied</b> vers ${state.evac?.cri?.separate ? 'le regroupement des impliqués' : 'le PMA'} (pas de brancard)`);
     else should.push('Évacuation : brancardage vers le PMA, après les UA');
     // oublis et erreurs
     const becameRed = v.truth.triage === 'RED' || evolves.some((x) => x.triage === 'RED');

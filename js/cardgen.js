@@ -221,7 +221,10 @@ function markSVG(m0, T, view = 'face') {
     }
     case 'ear': { const d = P[0] < T.axis ? -1 : 1; return at(P, [7, 13, 19].map((r) => `<path d="M${d * r * 0.5} ${-r * 0.8} Q${d * r * 1.1} 0 ${d * r * 0.5} ${r * 0.8}" fill="none" stroke="#6a1b9a" stroke-width="2.6" stroke-linecap="round"/>`).join('')); }
     case 'hematoma': return at(P, '<ellipse rx="14" ry="10" fill="#7b1fa2" opacity=".35"/>');
-    case 'tear': return at([T.axis, (A.chest[1] + A.abdomen[1]) / 2], '<path d="M-26 -44 L-15 -30 L-21 -16 L-7 -3 L-12 12 L4 24 L-2 38" fill="none" stroke="#b71c1c" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>');
+    case 'tear': if (!['abdomen', 'chest', 'body', 'ribs', 'flank', 'pelvis'].includes(m.region))   // déchirure d'un membre : à sa place
+        return at(P, '<path d="M-6 -16 L2 -9 L-4 -2 L4 5 L-2 12 L5 18" fill="none" stroke="#b71c1c" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>');
+      return at([T.axis, (A.chest[1] + A.abdomen[1]) / 2], '<path d="M-26 -44 L-15 -30 L-21 -16 L-7 -3 L-12 12 L4 24 L-2 38" fill="none" stroke="#b71c1c" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>');
+    case 'amput': return amputSVG(m, T);
     case 'tq': {
       const t = T.tq[m.region] ?? T.tq.thigh;
       const [w, h] = t[2] === 'v' ? [28, 8] : [36, 9];
@@ -231,6 +234,55 @@ function markSVG(m0, T, view = 'face') {
     }
     default: return '';
   }
+}
+
+// ---------- amputation : le membre disparaît sous la section, moignon à la bonne hauteur ----------
+//  La partie amputée est effacée (fond blanc de la fiche), rappelée en pointillés gris,
+//  et la section est marquée d'un bord rouge déchiqueté.
+const LEG_CHAIN = ['femoral', 'thigh', 'knee', 'calf', 'ankle', 'foot'];
+const ARM_CHAIN = ['shoulder', 'arm', 'elbow', 'forearm', 'hand'];
+function amputSVG(m, T) {
+  const A = T.a, k = T.k;
+  const leg = !['shoulder', 'arm', 'elbow', 'forearm', 'hand'].includes(m.region);
+  const chain = (leg ? LEG_CHAIN : ARM_CHAIN).map((r) => A[r]);
+  const last = chain[chain.length - 1];
+  chain.push(leg ? [last[0] + 2, last[1] + 16 * k] : [last[0] - 9, last[1] + 40 * k]);   // bout du pied / de la main
+  // point de section, selon la région
+  const mid = (a, b, f = 0.5) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+  const idx = (r) => (leg ? LEG_CHAIN : ARM_CHAIN).indexOf(r);
+  const cutAt = {
+    thigh: [mid(A.femoral, A.thigh, 0.8), idx('thigh')], knee: [A.knee, idx('knee')],
+    calf: [mid(A.knee, A.calf, 0.55), idx('calf')], leg: [mid(A.knee, A.calf, 0.55), idx('calf')],
+    ankle: [mid(A.calf, A.ankle, 0.75), idx('ankle')], foot: [mid(A.calf, A.ankle, 0.85), idx('ankle')],
+    arm: [mid(A.arm, A.elbow, 0.3), idx('elbow')], elbow: [A.elbow, idx('forearm')],
+    forearm: [mid(A.elbow, A.forearm, 0.6), idx('forearm')], hand: [mid(A.forearm, A.hand, 0.7), idx('hand')],
+  }[m.region] ?? [A.calf, idx('calf')];
+  const [c0, from] = cutAt;
+  const pts = [c0, ...chain.slice(Math.max(from, 1))].filter((p, i, a) => i === 0 || p[1] > a[0][1] - 1);
+  const side = (p) => (m.side === 'L' ? [2 * T.axis - p[0], p[1]] : p);
+  const P = pts.map(side);
+  const line = P.map((p) => p.map((v) => v.toFixed(1)).join(' ')).join(' L');
+  const w = (leg ? 34 : 32) * k;
+  // direction du membre à la section → bord déchiqueté perpendiculaire
+  const [x0, y0] = P[0], [x1, y1] = P[1] ?? [x0, y0 + 10];
+  const len = Math.hypot(x1 - x0, y1 - y0) || 1;
+  const ux = (x1 - x0) / len, uy = (y1 - y0) / len, nx = -uy, ny = ux;
+  const half = w * 0.5;
+  const jag = [-1, -0.6, -0.25, 0.1, 0.45, 0.8, 1].map((t, i) => {
+    const o = (i % 2 ? 4.5 : -1.5) * k;
+    return [x0 + nx * half * t + ux * o, y0 + ny * half * t + uy * o];
+  });
+  const jagD = 'M' + jag.map((p) => p.map((v) => v.toFixed(1)).join(' ')).join(' L');
+  const drops = [0.3, 0.7].map((f) => `<circle cx="${(x0 + nx * half * (f - 0.5) + ux * 11 * k).toFixed(1)}" cy="${(y0 + ny * half * (f - 0.5) + uy * 11 * k).toFixed(1)}" r="${(2.6 * k).toFixed(1)}" fill="#b71c1c"/>`).join('');
+  return `<g class="amput">
+    <path d="M${line}" fill="none" stroke="#fff" stroke-width="${w.toFixed(1)}" stroke-linejoin="round" stroke-linecap="butt"/>
+    <circle cx="${P[P.length - 1][0].toFixed(1)}" cy="${P[P.length - 1][1].toFixed(1)}" r="${(w / 2 + (leg ? 4 : 14) * k).toFixed(1)}" fill="#fff"/>
+    ${leg ? '' : (() => { const h = side(A.hand); return `<ellipse cx="${(h[0] + (m.side === 'L' ? 6 : -6) * k).toFixed(1)}" cy="${(h[1] + 8 * k).toFixed(1)}" rx="${(24 * k).toFixed(1)}" ry="${(30 * k).toFixed(1)}" fill="#fff"/>`; })()}
+    <path d="M${line}" fill="none" stroke="#9e9e9e" stroke-width="${(w * 0.62).toFixed(1)}" stroke-opacity=".16" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M${line}" fill="none" stroke="#9e9e9e" stroke-width="${(1.6 * k).toFixed(1)}" stroke-dasharray="${(5 * k).toFixed(1)} ${(4 * k).toFixed(1)}" stroke-linecap="round"/>
+    <path d="${jagD}" fill="none" stroke="#e57373" stroke-width="${(9 * k).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round" opacity=".55"/>
+    <path d="${jagD}" fill="none" stroke="#b71c1c" stroke-width="${(4 * k).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"/>
+    ${drops}</g>`;
 }
 
 const LEGEND = {
@@ -246,6 +298,7 @@ const LEGEND = {
   hematoma: ['<ellipse cx="0" cy="0" rx="9" ry="6" fill="#7b1fa2" opacity=".45"/>', 'hématome'],
   tear: ['<path d="M-7 -6 L-2 -1 L-5 3 L2 7" fill="none" stroke="#b71c1c" stroke-width="3"/>', 'déchirure'],
   tq: ['<rect x="-10" y="-4" width="20" height="8" rx="3" fill="#212121"/>', 'garrot'],
+  amput: ['<line x1="0" y1="-8" x2="0" y2="1" stroke="#bdbdbd" stroke-width="7" stroke-linecap="round"/><line x1="0" y1="3" x2="0" y2="9" stroke="#9e9e9e" stroke-width="1.5" stroke-dasharray="2 2"/><path d="M-7 1 L-3 4 L0 0 L3 4 L7 1" fill="none" stroke="#b71c1c" stroke-width="2.5"/>', 'amputation'],
   exit: ['<circle r="4" fill="#fff" stroke="#b71c1c" stroke-width="2"/><line x1="-8" y1="0" x2="8" y2="0" stroke="#b71c1c" stroke-width="2"/>', 'orifice de sortie'],
 };
 
@@ -256,7 +309,7 @@ const LIMB_TQ = { arm: 'arm', elbow: 'arm', forearm: 'forearm', hand: 'forearm',
 const limbClass = (r) => (['arm', 'elbow', 'forearm', 'hand'].includes(r) ? 'arm' : 'leg');
 const JUNCTION = ['groin', 'femoral', 'neck', 'pelvis', 'flank', 'shoulder'];
 const THORAX = ['chest', 'ribs', 'heart'];
-const WOUNDS = ['ball', 'graze', 'cut', 'shards', 'exit', 'tear', 'hematoma'];
+const WOUNDS = ['ball', 'graze', 'cut', 'shards', 'exit', 'tear', 'hematoma', 'amput'];
 const fmt0 = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
 function careSVG(all, care, T, view, noTimes = false) {
@@ -369,7 +422,7 @@ export function cardSVG(e, opts = {}) {
     const col = i % 2, row = Math.floor(i / 2);
     return `<g transform="translate(${86 + col * 160} ${966 - (Math.ceil(used.length / 2) - 1 - row) * 20})">${LEGEND[k][0]}<text x="15" y="6" font-family='${F}' font-size="17" fill="#666">${LEGEND[k][1]}</text></g>`;
   }).join('');
-  const order = ['burn', 'hematoma', 'tq', 'tear', 'blast', 'shards', 'graze', 'cut', 'blunt', 'fracture', 'ball', 'ear'];
+  const order = ['amput', 'burn', 'hematoma', 'tq', 'tear', 'blast', 'shards', 'graze', 'cut', 'blunt', 'fracture', 'ball', 'ear'];
   const drawn = [...marks].sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)).map((m) => markSVG(m, T, view)).join('')
     + careSVG(all, care, T, view, opts.noTimes);
   const dosImg = view === 'dos' ? opts.dosImages?.[tplName] : null;

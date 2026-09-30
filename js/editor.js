@@ -28,7 +28,7 @@ const KINDS = [
   ['ball', 'Plaie par balle'], ['exit', 'Orifice de sortie'], ['graze', 'Éraflure (tangentielle)'], ['cut', 'Plaie arme blanche'],
   ['blunt', 'Contusion / entorse / luxation'], ['fracture', 'Fracture'], ['burn', 'Brûlure'], ['shards', 'Éclats'],
   ['blast', 'Criblage (explosion)'], ['ear', 'Blast auriculaire'], ['hematoma', 'Hématome'], ['tear', 'Déchirure / éviscération'],
-  ['tq', 'Garrot déjà posé'],
+  ['tq', 'Garrot déjà posé'], ['amput', 'Amputation'],
 ];
 const REGIONS = [
   ['head', 'Crâne'], ['forehead', 'Front'], ['face', 'Visage'], ['ear', 'Oreille'], ['neck', 'Cou'], ['shoulder', 'Épaule'],

@@ -118,7 +118,7 @@ export function showMenu(scenarios) {
     }
     const n = Number(range.value);
     out.textContent = n;
-    stock.textContent = sc.mpapOf ? `MPAP : les ${sc.public?.count ?? 150} fiches + une cinquantaine de décédés à l'entrée, survivants cachés sous les corps. Matériel illimité, pas de chrono, pas de déplacement. Évolution à la demande (T+5, T+10…).`
+    stock.textContent = sc.mpapOf ? `MPAP : les ${sc.public?.count ?? 150} fiches${(sc.mpap?.extraDead ?? 50) > 0 ? ` + ${sc.mpap?.extraDead ?? 50} décédés entassés à l'entrée` : ''}, survivants cachés sous les corps. Matériel illimité, pas de chrono, pas de déplacement. Évolution à la demande (T+5, T+10…).`
       : 'Sac de départ : ' + describeStock(scaledStock(n, sc).items);
   }
 

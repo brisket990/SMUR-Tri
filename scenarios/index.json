@@ -5,6 +5,11 @@
    "id": "bataclan",
    "code": "BAT",
    "name": "Attaque armée — salle de spectacle"
+  },
+  {
+   "id": "metro",
+   "code": "MET",
+   "name": "Explosion — station de métro (RER)"
   }
  ]
 }
