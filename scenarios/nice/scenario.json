@@ -1,0 +1,362 @@
+{
+ "_comment": "Description publique du scénario (aucune donnée clinique). Les fiches et le tri attendu sont chiffrés à part par outils/chiffrer.py. Coordonnées des zones : 0..1 du plan, [x, y, largeur, hauteur] ; touche D en jeu pour les afficher. Plan : promenade en bord de mer après le passage d'un véhicule-bélier (inspiré de Nice, 14 juillet 2016).",
+ "id": "nice",
+ "code": "NIC",
+ "name": "Véhicule-bélier — promenade en bord de mer",
+ "subtitle": "Un poids lourd lancé dans la foule d'un feu d'artifice, nombreux enfants",
+ "plan": "plan.jpg",
+ "cardBack": "../../images/verso.jpg",
+ "victims": {
+  "min": 15,
+  "max": 150,
+  "step": 5,
+  "default": 50
+ },
+ "stock": {
+  "tourniquet": 9,
+  "compressive": 9,
+  "hemostatic": 9,
+  "chestSeal": 3,
+  "needle": 3,
+  "blanket": 9,
+  "oxygen": 2
+ },
+ "stockFor": 150,
+ "logistics": [
+  {
+   "atMin": 12,
+   "label": "VL LOG 1",
+   "items": {
+    "tourniquet": 10,
+    "compressive": 15,
+    "hemostatic": 6,
+    "chestSeal": 8,
+    "blanket": 20,
+    "needle": 4
+   },
+   "smurTeams": 1
+  },
+  {
+   "atMin": 25,
+   "label": "VL LOG 2",
+   "items": {
+    "tourniquet": 15,
+    "compressive": 20,
+    "hemostatic": 8,
+    "chestSeal": 10,
+    "blanket": 30,
+    "needle": 6
+   },
+   "smurTeams": 1
+  }
+ ],
+ "briefing": {
+  "from": "SAMU — Régulation médicale",
+  "time": "22 h 50",
+  "title": "Véhicule-bélier dans la foule, promenade en bord de mer",
+  "paragraphs": [
+   "Exercice, exercice, exercice.",
+   "Il y a quinze minutes, un poids lourd a foncé dans la foule réunie sur la promenade du bord de mer pour le feu d'artifice, sur près de deux kilomètres. Des milliers de personnes étaient présentes, beaucoup de familles avec enfants. Le conducteur a été neutralisé.",
+   "Les forces de l'ordre ont sécurisé ce tronçon. Des mouvements de foule se poursuivent dans les rues voisines.",
+   "Vous êtes la première équipe SMUR engagée sur ce tronçon, par la rue à l'ouest. Des victimes sont sur la promenade, sur la chaussée, autour du carrousel, aux terrasses des cafés et sur la plage en contrebas. {victimes}",
+   "Le PMA est installé sous le porche à l'ouest (brancards). Les impliqués qui marchent sont regroupés dans la rue à l'est, au bout de la promenade.",
+   "Une équipe de pompiers est déjà sur place avec vous : bilans secouristes, gestes avec son propre sac, signalement des urgences absolues. Le tri reste le vôtre.",
+   "Votre mission : le premier tour de catégorisation. Beaucoup d'enfants : leurs constantes ne sont pas celles d'un adulte. Un enfant pâle et tachycarde avec une tension normale est en choc. Aucun enfant ne doit rester seul.",
+   "Votre sac contient : {sac}. {renfort}"
+  ],
+  "orders": [
+   "Quelques secondes par victime : trier d'abord, soigner ensuite.",
+   "Écrasement par un poids lourd : pensez bassin, abdomen et thorax même sans plaie visible.",
+   "Les valides vers le regroupement des impliqués (est), les brancards vers le PMA (ouest)."
+  ]
+ },
+ "zones": [
+  {
+   "id": "promenade_debut",
+   "label": "Promenade — début du trajet",
+   "kind": "promenade_debut",
+   "weight": 30,
+   "rects": [
+    [
+     0.0999,
+     0.7031,
+     0.125,
+     0.0579
+    ],
+    [
+     0.2249,
+     0.6452,
+     0.125,
+     0.0983
+    ]
+   ]
+  },
+  {
+   "id": "promenade_milieu",
+   "label": "Promenade — milieu",
+   "kind": "promenade_milieu",
+   "weight": 32,
+   "rects": [
+    [
+     0.3499,
+     0.627,
+     0.125,
+     0.1029
+    ],
+    [
+     0.4749,
+     0.5599,
+     0.125,
+     0.1341
+    ]
+   ]
+  },
+  {
+   "id": "carrousel",
+   "label": "Carrousel et kiosque à musique",
+   "kind": "carrousel",
+   "weight": 24,
+   "rects": [
+    [
+     0.5999,
+     0.4883,
+     0.1501,
+     0.1478
+    ],
+    [
+     0.75,
+     0.4258,
+     0.085,
+     0.0807
+    ]
+   ]
+  },
+  {
+   "id": "camion",
+   "label": "Devant le camion",
+   "kind": "camion",
+   "weight": 8,
+   "rects": [
+    [
+     0.7649,
+     0.515,
+     0.06,
+     0.0853
+    ]
+   ]
+  },
+  {
+   "id": "chaussee",
+   "label": "Chaussée",
+   "kind": "chaussee",
+   "weight": 18,
+   "rects": [
+    [
+     0.1701,
+     0.5104,
+     0.145,
+     0.1257
+    ],
+    [
+     0.315,
+     0.4297,
+     0.1501,
+     0.1341
+    ],
+    [
+     0.4651,
+     0.3496,
+     0.1501,
+     0.1341
+    ],
+    [
+     0.6148,
+     0.2689,
+     0.1501,
+     0.1341
+    ]
+   ]
+  },
+  {
+   "id": "terrasses",
+   "label": "Terrasses des cafés",
+   "kind": "terrasses",
+   "weight": 22,
+   "rects": [
+    [
+     0.2049,
+     0.3542,
+     0.185,
+     0.0579
+    ],
+    [
+     0.4226,
+     0.2643,
+     0.085,
+     0.0449
+    ],
+    [
+     0.71,
+     0.1432,
+     0.06,
+     0.0449
+    ]
+   ]
+  },
+  {
+   "id": "plage",
+   "label": "Escalier et plage",
+   "kind": "plage",
+   "weight": 16,
+   "rects": [
+    [
+     0.4826,
+     0.7272,
+     0.06,
+     0.0579
+    ],
+    [
+     0.5451,
+     0.7259,
+     0.1599,
+     0.0807
+    ],
+    [
+     0.71,
+     0.6536,
+     0.1799,
+     0.0898
+    ]
+   ]
+  }
+ ],
+ "scale": {
+  "planWidthMeters": 120,
+  "_comment": "largeur réelle représentée par le plan, pour convertir distances et temps"
+ },
+ "team": {
+  "start": [
+   0.1599,
+   0.5404
+  ],
+  "reachMeters": 4,
+  "speedMps": 1.4,
+  "label": "SMUR"
+ },
+ "evacuation": {
+  "pma": [
+   0.125,
+   0.3646
+  ],
+  "pmaLabel": "PMA",
+  "walkSpeedMps": 0.8,
+  "stretcherSpeedMps": 0.7,
+  "emptySpeedMps": 1.2,
+  "loadSec": 70,
+  "unloadSec": 30,
+  "teams": [
+   {
+    "atMin": 4,
+    "org": "Pompiers",
+    "prefix": "SP",
+    "count": 2,
+    "color": "#e53935",
+    "rescuers": 2,
+    "items": {
+     "oxygen": 3,
+     "tourniquet": 3,
+     "compressive": 4,
+     "blanket": 6
+    }
+   },
+   {
+    "atMin": 9,
+    "org": "Croix-Rouge",
+    "prefix": "CRF",
+    "count": 2,
+    "color": "#f5f5f5",
+    "rescuers": 3
+   },
+   {
+    "atMin": 14,
+    "org": "Sécurité civile",
+    "prefix": "SC",
+    "count": 3,
+    "color": "#ffb300",
+    "rescuers": 4
+   },
+   {
+    "atMin": 20,
+    "org": "Pompiers (renfort)",
+    "prefix": "SP",
+    "count": 2,
+    "color": "#e53935",
+    "rescuers": 2,
+    "items": {
+     "oxygen": 3,
+     "tourniquet": 3,
+     "compressive": 4,
+     "blanket": 6
+    }
+   }
+  ],
+  "fatiguePerTrip": 0.12,
+  "fatigueMax": 0.6,
+  "rescuerEffect": {
+   "compression": 2,
+   "surveillance": 1.3
+  },
+  "_items": "teams[].items : matériel apporté PAR ÉQUIPE et versé dans le sac commun à son arrivée (pompiers : O2, garrots, pansements, couvertures).",
+  "pmaClearMeters": 5,
+  "walkTo": [
+   0.8576,
+   0.1628
+  ],
+  "walkLabel": "Regroupement des impliqués",
+  "_walkTo": "Point où rejoignent les victimes à pied (impliqués), distinct du PMA des brancards."
+ },
+ "smurTeams": {
+  "speedMps": 1.3,
+  "examineSec": 40,
+  "careSec": 30,
+  "doCare": true
+ },
+ "pompiers": {
+  "_comment": "Équipe déjà sur place à T+0 : ne trie pas, gestes de secourisme avec son propre sac, signale les UA (drapeau « ! »). enabled: false pour la retirer.",
+  "enabled": true,
+  "label": "Pompiers",
+  "vehicle": "VSAV",
+  "teams": 1,
+  "speedMps": 1.2,
+  "bilanSec": 35,
+  "careSec": 25,
+  "bag": {
+   "tourniquet": 4,
+   "compressive": 6,
+   "blanket": 6,
+   "oxygen": 3
+  },
+  "_bag": "Sac des pompiers : garrots, pansements compressifs, couvertures, O2. Pas d'hémostatique, de 3 côtés ni de stylo d'exsufflation."
+ },
+ "intro": {
+  "_comment": "Animation d'arrivée : appel des valides. walkers = [min, max] fausses cartes (tirage au hasard entre les deux), qui rejoignent le SMUR puis le PMA. Purement visuel.",
+  "enabled": true,
+  "text": "Si vous pouvez marcher, venez vers moi !",
+  "walkers": [
+   45,
+   55
+  ]
+ },
+ "stockFixed": true,
+ "_stock": "stock = sac du SMUR joueur au départ. stockFixed: true → ces quantités ne varient pas avec le nombre de victimes (les VL LOG, elles, sont ajustées).",
+ "mpap": {
+  "entrance": [
+   0.3997,
+   0.6445
+  ],
+  "extraDead": 0,
+  "hiddenShare": 0.05,
+  "deadBand": 0.12,
+  "_comment": "MPAP : gravité décroissante autour du milieu de la promenade, sur le trajet du camion."
+ }
+}

@@ -343,7 +343,7 @@ async function start(list, access) {
       const sil = { homme: 'homme', femme: 'femme', enfant: 'enfant', bebe: 'bébé' }[templateFor(c)] ?? '';
       f.innerHTML = `
         <div class="ed-row">
-          ${field('Sexe', `<select data-p="clinical.sex">${['Homme', 'Femme'].map((s) => `<option ${c.sex === s ? 'selected' : ''}>${s}</option>`).join('')}</select>`)}
+          ${field('Sexe', `<select data-p="clinical.sex">${['Homme', 'Femme', 'Garçon', 'Fille'].map((s) => `<option ${c.sex === s ? 'selected' : ''}>${s}</option>`).join('')}</select>`)}
           ${field('Âge', inp('clinical.age', c.age, 'type="number" min="0" max="110" data-num'), `silhouette : ${sil}`)}
         </div>
         ${field('Mécanisme', inp('clinical.mechanism', c.mechanism))}

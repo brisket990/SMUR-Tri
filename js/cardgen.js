@@ -124,7 +124,7 @@ export function templateFor(c) {
   const age = Number(c?.age);
   if (age && age < 3) return 'bebe';
   if (age && age < 13) return 'enfant';
-  return c?.sex === 'Femme' ? 'femme' : 'homme';
+  return c?.sex === 'Femme' || c?.sex === 'Fille' ? 'femme' : 'homme';
 }
 const CENTRAL = new Set(['head', 'forehead', 'face', 'neck', 'abdomen', 'pelvis', 'heart', 'body']);
 

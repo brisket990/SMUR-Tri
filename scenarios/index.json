@@ -10,6 +10,11 @@
    "id": "metro",
    "code": "MET",
    "name": "Explosion — station de métro (RER)"
+  },
+  {
+   "id": "nice",
+   "code": "NIC",
+   "name": "Véhicule-bélier — promenade en bord de mer"
   }
  ]
 }
