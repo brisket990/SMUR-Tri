@@ -1,0 +1,22 @@
+VOS VOIX ENREGISTRÉES (MP3)
+===========================
+
+Déposez ici vos enregistrements, sous ces noms exacts (minuscules) :
+
+  briefing-bataclan.mp3   lecture du briefing (bouton « Écouter ») du scénario Bataclan
+  briefing-metro.mp3      … du scénario métro
+  briefing-nice.mp3       … du scénario promenade
+  briefing.mp3            briefing commun, utilisé si le scénario n'a pas le sien
+
+  appel-bataclan.mp3      l'appel à l'arrivée : « Si vous pouvez marcher, venez vers moi ! »
+  appel-metro.mp3
+  appel-nice.mp3
+  appel.mp3               appel commun, utilisé si le scénario n'a pas le sien
+
+Fichier absent = le jeu garde la voix de synthèse de l'ordinateur.
+Le mode MPAP utilise les fichiers de son scénario (pas d'appel en MPAP).
+L'appel ne joue que si l'option « Sons » est activée.
+
+Conseils : MP3 mono, 96 à 128 kbit/s, volume normalisé.
+Briefing : quelques dizaines de secondes à 2 minutes. Appel : 2 à 4 secondes.
+Ces fichiers sont publics une fois en ligne : n'y mettez rien de confidentiel.

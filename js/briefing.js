@@ -1,3 +1,4 @@
+import { playVoice } from './voice.js';
 // ============================================================
 //  Briefing de lancement : message de situation du scénario
 // ============================================================
@@ -39,7 +40,7 @@ export function fillBriefing(scenario, { count, stock, player }) {
 }
 
 /** Affiche le briefing ; résout quand l'équipe est engagée. */
-export function showBriefing(content, { onEngage } = {}) {
+export function showBriefing(content, { onEngage, voiceUrl = null } = {}) {
   const $ = (id) => document.getElementById(id);
   const box = $('briefing');
   const text = $('briefing-text');
@@ -95,14 +96,24 @@ export function showBriefing(content, { onEngage } = {}) {
   // ---------- lecture à voix haute ----------
   const synth = globalThis.speechSynthesis;
   const canSpeak = CONFIG.briefing.voice && synth && typeof SpeechSynthesisUtterance !== 'undefined';
-  voiceBtn.hidden = !canSpeak;
+  voiceBtn.hidden = !canSpeak && !voiceUrl;
   let speaking = false;
+  let rec = null;                       // votre enregistrement (MP3) en cours
   function stopVoice() {
     if (canSpeak) synth.cancel();
+    rec?.stop(); rec = null;
     speaking = false;
     voiceBtn.textContent = '🔊 Écouter';
   }
-  if (canSpeak) {
+  if (voiceUrl) {
+    voiceBtn.onclick = () => {
+      if (speaking) return stopVoice();
+      finish();
+      rec = playVoice(voiceUrl, { onEnd: stopVoice });
+      speaking = true;
+      voiceBtn.textContent = '■ Arrêter la lecture';
+    };
+  } else if (canSpeak) {
     voiceBtn.onclick = () => {
       if (speaking) return stopVoice();
       finish();

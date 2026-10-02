@@ -1,3 +1,4 @@
+import { playVoice } from './voice.js';
 // ============================================================
 //  Animation d'arrivée : « Si vous pouvez marcher, venez vers moi ! »
 // ============================================================
@@ -9,7 +10,7 @@
 
 import { logEvent } from './state.js';
 
-export function createIntro(state, scenario, plan, { team, pma, cri = null, camera, amb, backImage, voice = true, count }) {
+export function createIntro(state, scenario, plan, { team, pma, cri = null, camera, amb, backImage, voice = true, voiceUrl = null, count }) {
   const C = { enabled: true, walkers: [45, 55], speedMps: 3.2, text: 'Si vous pouvez marcher, venez vers moi !', ...(scenario.intro ?? {}) };
   const walkers = [];
   let started = false;
@@ -51,6 +52,7 @@ export function createIntro(state, scenario, plan, { team, pma, cri = null, came
   }
 
   function speak(text) {
+    if (voiceUrl) { playVoice(voiceUrl); return; }    // votre enregistrement
     const synth = globalThis.speechSynthesis;
     if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
     const u = new SpeechSynthesisUtterance(text);

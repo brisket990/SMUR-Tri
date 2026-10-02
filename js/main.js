@@ -36,6 +36,7 @@ import { selectVictims } from './selection.js';
 import { scaledStock } from './stock.js';
 import { unlock, openJSON, openImageURL } from './secure.js';
 import { activeCorrections, applyCorrections } from './corrections.js';
+import { findVoice } from './voice.js';
 import { generatedCardURL } from './cardgen.js';
 
 const $ = (id) => document.getElementById(id);
@@ -445,8 +446,12 @@ async function boot() {
   renderer.addOverlay((ctx) => smur.draw(ctx, camera));
   renderer.addOverlay((ctx) => pompiers.draw(ctx, camera));
   renderer.addOverlay((ctx) => drawZoneLight(ctx, camera, scenario, plan, performance.now() / 1000));
+  // voix enregistrées (sons/voix/), sinon synthèse vocale
+  const voiceId = scenario.dataId ?? scenario.id;
+  const [briefVoice, callVoice] = await Promise.all([findVoice('briefing', voiceId), findVoice('appel', voiceId)]);
   // animation d'arrivée : appel des valides
   const intro = createIntro(state, scenario, plan, {
+    voiceUrl: callVoice,
     team, pma: evac.pma, cri: evac.cri, camera, amb, backImage: backThumb, count: entries.length,
     voice: choice.ambience.sound,
   });
@@ -519,6 +524,7 @@ async function boot() {
 
   // 11. Briefing du scénario (le plan est déjà visible en fond), puis top chrono
   await showBriefing(fillBriefing(scenario, { count: entries.length, stock, player }), {
+    voiceUrl: briefVoice,
     onEngage: () => { if (choice.ambience.sound && (choice.ambience.phones || choice.ambience.outside)) sound.unlock(); },
   });
   state.clock.running = !MPAP;             // MPAP : le temps ne passe pas (pas d'aggravation)

@@ -4,9 +4,9 @@
  "iterations": 250000,
  "entries": [
   {
-   "label": "Code",
-   "salt": "sG2QXl7DdNxs1pcznCHlQw==",
-   "wrapped": "IdM+5aZEAI7EcpBUzozj2cdvSkPW3qklaI6m7GOLcBd7E4O4EcYhE3G5UbdmuqxAVH8Gik8sJi8mPwIu"
+   "label": "D\u00e9monstration",
+   "salt": "p78qfpEohBbvWwESKb8QJw==",
+   "wrapped": "T3yelHqCKdpscEeNACnU5b5EyG/rkI1dq8pXiDPJ7azPo387ium/dGFAZB/O2MxoJ7bZ34KF3oztGv5Z"
   }
  ]
 }
