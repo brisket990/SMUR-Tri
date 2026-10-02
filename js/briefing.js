@@ -40,7 +40,7 @@ export function fillBriefing(scenario, { count, stock, player }) {
 }
 
 /** Affiche le briefing ; résout quand l'équipe est engagée. */
-export function showBriefing(content, { onEngage, voiceUrl = null } = {}) {
+export function showBriefing(content, { onEngage, voiceUrl = null, paper = false, music = null } = {}) {
   const $ = (id) => document.getElementById(id);
   const box = $('briefing');
   const text = $('briefing-text');
@@ -56,6 +56,7 @@ export function showBriefing(content, { onEngage, voiceUrl = null } = {}) {
   orders.hidden = true;
   text.innerHTML = '';
   const tabs = setupBriefingTabs();
+  box.classList.toggle('paper', !!paper);
   box.hidden = false;
   go.focus();
 
@@ -102,6 +103,7 @@ export function showBriefing(content, { onEngage, voiceUrl = null } = {}) {
   function stopVoice() {
     if (canSpeak) synth.cancel();
     rec?.stop(); rec = null;
+    if (speaking) music?.unduck();
     speaking = false;
     voiceBtn.textContent = '🔊 Écouter';
   }
@@ -109,6 +111,7 @@ export function showBriefing(content, { onEngage, voiceUrl = null } = {}) {
     voiceBtn.onclick = () => {
       if (speaking) return stopVoice();
       finish();
+      music?.duck();
       rec = playVoice(voiceUrl, { onEnd: stopVoice });
       speaking = true;
       voiceBtn.textContent = '■ Arrêter la lecture';
@@ -124,6 +127,7 @@ export function showBriefing(content, { onEngage, voiceUrl = null } = {}) {
       if (fr) u.voice = fr;
       u.onend = u.onerror = stopVoice;
       synth.cancel();
+      music?.duck();
       synth.speak(u);
       speaking = true;
       voiceBtn.textContent = '■ Arrêter la lecture';
@@ -135,6 +139,7 @@ export function showBriefing(content, { onEngage, voiceUrl = null } = {}) {
       onEngage?.();   // dans le clic : les navigateurs n'autorisent le son qu'après un geste
       finish();
       stopVoice();
+      music?.stop(1500);
       box.hidden = true;
       resolve();
     };

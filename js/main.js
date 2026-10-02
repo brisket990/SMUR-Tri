@@ -30,6 +30,7 @@ import { createRescuers } from './rescuers.js';
 import { createSmurTeams } from './smurTeams.js';
 import { createPompiers } from './pompiers.js';
 import { createIntro } from './intro.js';
+import { primeCinematic, playCinematic, musicCtl } from './cinematique.js';
 import { setupScrollHints } from './scrollhint.js';
 import { drawZoneLight } from './orders.js';
 import { selectVictims } from './selection.js';
@@ -68,6 +69,8 @@ async function boot() {
   const history = createHistory();
   $('menu-history').addEventListener('click', () => history.open());
   const choice = await showMenu(scenarios);
+  // encore dans le clic « Lancer » : on prépare la vidéo et on débloque le son
+  if (choice.ambience.cine) primeCinematic({ withMusic: choice.ambience.sound });
   $('loading').hidden = false;
   $('loading-text').textContent = 'Vérification…';
 
@@ -523,8 +526,11 @@ async function boot() {
   requestAnimationFrame(frame);
 
   // 11. Briefing du scénario (le plan est déjà visible en fond), puis top chrono
+  const cine = choice.ambience.cine ? await playCinematic() : false;
   await showBriefing(fillBriefing(scenario, { count: entries.length, stock, player }), {
     voiceUrl: briefVoice,
+    paper: cine,              // après la vidéo : le briefing s'écrit sur la feuille du fax
+    music: musicCtl,
     onEngage: () => { if (choice.ambience.sound && (choice.ambience.phones || choice.ambience.outside)) sound.unlock(); },
   });
   state.clock.running = !MPAP;             // MPAP : le temps ne passe pas (pas d'aggravation)

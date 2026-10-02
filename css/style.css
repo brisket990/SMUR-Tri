@@ -716,3 +716,42 @@ body.editor-open { overflow: hidden; }
   background: rgba(0,0,0,.45); border: 1px solid rgba(255,205,210,.35); color: #ffe4e6; font-size: 15px; line-height: 1.45; }
 .death-contact b { color: #fff; font-size: 16px; }
 .death-contact strong { color: #fff; }
+
+/* ---------- Cinématique d'ouverture (video/intro.mp4) ---------- */
+.cine { position: fixed; inset: 0; z-index: 60; background: #000; display: grid; place-items: center; overflow: hidden;
+  opacity: 0; transition: opacity .5s ease; }
+.cine.on { opacity: 1; }
+.cine-stage { width: 100%; height: 100%; display: grid; place-items: center; transition: transform var(--zoom, 1100ms) cubic-bezier(.55, 0, .9, .45); }
+.cine-stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cine.zoom .cine-stage { transform: scale(4.2); }
+.cine-white { position: absolute; inset: 0; background: #f7f5ee; opacity: 0; pointer-events: none;
+  transition: opacity calc(var(--zoom, 1100ms) * .6) ease-in calc(var(--zoom, 1100ms) * .4); }
+.cine.zoom .cine-white { opacity: 1; }
+.cine.out { opacity: 0; transition: opacity .9s ease; pointer-events: none; }
+.cine-skip { position: absolute; right: 24px; bottom: 22px; background: rgba(0,0,0,.55); color: #ddd; border: 1px solid rgba(255,255,255,.25);
+  border-radius: 999px; padding: 8px 16px; font-weight: 600; letter-spacing: .04em; cursor: pointer; }
+.cine-skip:hover { background: rgba(0,0,0,.8); color: #fff; }
+.cine-skip[hidden], .cine-play[hidden] { display: none; }
+.cine-play { position: absolute; background: var(--red); color: #fff; border: 0; border-radius: 999px; padding: 16px 28px; font-size: 18px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+
+/* ---------- Briefing « feuille de fax » (après la cinématique) ---------- */
+.briefing.paper { background: radial-gradient(ellipse at 50% 40%, rgba(30, 28, 24, .80), rgba(5, 6, 9, .96) 75%); }
+.briefing.paper .briefing-card { background: #f7f5ee; color: #1d1c1a; border: 0; border-top: 0; border-radius: 3px;
+  box-shadow: 0 30px 90px rgba(0,0,0,.75), inset 0 0 60px rgba(120, 100, 60, .10);
+  background-image: repeating-linear-gradient(0deg, transparent 0 27px, rgba(40, 40, 60, .045) 27px 28px);
+  animation: paper-in .7s ease-out both; }
+@keyframes paper-in { from { transform: scale(1.06); filter: brightness(1.15); } to { transform: none; filter: none; } }
+.briefing.paper .briefing-head { color: #4a4740; border-bottom: 2px dashed #b9b4a6; padding-bottom: 8px; }
+.briefing.paper .briefing-card h2 { color: #111; text-transform: uppercase; letter-spacing: .04em; }
+.briefing.paper .briefing-text { color: #1d1c1a; }
+.briefing.paper .briefing-text p:first-child { color: #9a1b1f; }
+.briefing.paper .briefing-text .caret { background: #1d1c1a; }
+.briefing.paper .briefing-orders { background: rgba(0, 0, 0, .05); border-left-color: #9a1b1f; color: #1d1c1a; }
+.briefing.paper .briefing-tabs { border-bottom-color: #cfc9b8; }
+.briefing.paper .briefing-tabs button { color: #6d685c; }
+.briefing.paper .briefing-tabs button.on { color: #111; border-bottom-color: #9a1b1f; }
+.briefing.paper .briefing-actions { background: #f7f5ee; border-top-color: #cfc9b8; }
+.briefing.paper .briefing-actions button:not(.briefing-go) { background: #e9e5d8; color: #1d1c1a; border: 1px solid #c9c2b0; }
+.briefing.paper .muted { color: #6d685c; }
+.briefing.paper .tuto-host { background: #0d0f13; color: var(--text); border-radius: 8px; padding: 14px 16px; }

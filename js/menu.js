@@ -167,7 +167,7 @@ export function showMenu(scenarios) {
 
   // ---------- options d'ambiance (mémorisées) ----------
   const opts = {};
-  for (const k of ['bubbles', 'phones', 'sound', 'outside']) {
+  for (const k of ['bubbles', 'phones', 'sound', 'outside', 'cine']) {
     const box = $(`opt-${k}`);
     const saved = store.get(`smur.opt.${k}`);
     box.checked = saved == null ? CONFIG.ambience.defaults[k] ?? true : saved === '1';
@@ -230,6 +230,7 @@ export function showMenu(scenarios) {
           phones: opts.phones.checked,
           sound: opts.sound.checked,
           outside: opts.sound.checked && opts.outside.checked,
+          cine: opts.cine.checked,
         },
       });
     });
