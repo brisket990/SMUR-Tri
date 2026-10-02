@@ -16,6 +16,7 @@ const SHEET = { x: 48, y: 47 };          // centre de la feuille sur la dernièr
 
 let video = null;
 let music = null;
+let box = null;                          // écran noir posé dès le clic « Lancer »
 
 async function exists(url) {
   try {
@@ -33,6 +34,16 @@ export function primeCinematic({ withMusic = true } = {}) {
   video.playsInline = true;
   video.muted = true;               // la vidéo n'a pas de son : la musique est à part
   video.load();
+  // écran noir tout de suite : le terrain ne doit pas apparaître avant la vidéo
+  box = document.createElement('div');
+  box.className = 'cine on';
+  box.innerHTML = `
+    <div class="cine-stage"></div>
+    <div class="cine-white"></div>
+    <div class="cine-wait">Chargement…</div>
+    <button type="button" class="cine-play" hidden>▶ Lancer la vidéo</button>
+    <button type="button" class="cine-skip" hidden>Passer ▸▸</button>`;
+  document.body.appendChild(box);
   if (withMusic) {
     music = new Audio(MUSIC);
     music.preload = 'auto';
@@ -73,20 +84,14 @@ export const musicCtl = {
  * (fin de vidéo ou « Passer »). Résout tout de suite si la vidéo manque.
  */
 export async function playCinematic() {
-  if (!video || !(await exists(VIDEO))) { musicCtl.stop(0); return false; }
-
-  const box = document.createElement('div');
-  box.className = 'cine';
-  box.innerHTML = `
-    <div class="cine-stage"></div>
-    <div class="cine-white"></div>
-    <button type="button" class="cine-play" hidden>▶ Lancer la vidéo</button>
-    <button type="button" class="cine-skip">Passer ▸▸</button>`;
+  if (!video || !(await exists(VIDEO))) {
+    musicCtl.stop(0);
+    if (box) { const b = box; b.classList.add('out'); setTimeout(() => b.remove(), 900); }
+    return false;
+  }
   const stage = box.querySelector('.cine-stage');
   stage.appendChild(video);
   stage.style.transformOrigin = `${SHEET.x}% ${SHEET.y}%`;
-  document.body.appendChild(box);
-  requestAnimationFrame(() => box.classList.add('on'));
 
   // attendre que la vidéo puisse démarrer, puis vidéo + musique au même instant
   if (video.readyState < 3) {
@@ -98,6 +103,8 @@ export async function playCinematic() {
     });
   }
 
+  box.querySelector('.cine-wait').remove();
+  box.querySelector('.cine-skip').hidden = false;
   let finished = false;
   return new Promise((resolve) => {
     const end = async (fast) => {

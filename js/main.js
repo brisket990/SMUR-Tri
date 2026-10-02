@@ -545,6 +545,7 @@ function newGame() {
 
 boot().catch((err) => {
   console.error(err);
+  document.querySelector('.cine')?.remove();     // ne pas masquer le message d'erreur
   $('menu').hidden = true;
   $('loading').hidden = false;
   const hint = location.protocol === 'file:'
