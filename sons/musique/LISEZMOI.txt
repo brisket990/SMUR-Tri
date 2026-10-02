@@ -1,0 +1,12 @@
+MUSIQUE D AMBIANCE PENDANT LA PARTIE
+
+Deposez ici vos MP3 :
+  ambiance.mp3            pour tous les scenarios
+  ambiance-bataclan.mp3   propre au Bataclan (prioritaire)
+  ambiance-metro.mp3      propre au metro
+  ambiance-nice.mp3       propre a la promenade
+
+La piste tourne en boucle sans coupure : idealement 2 a 4 minutes,
+qui finit comme elle commence. Pas de musique en mode MPAP.
+Volume et interrupteur : Options du menu. Touche M en jeu = tout couper.
+Puis py outils\publier.py, Commit et Push.

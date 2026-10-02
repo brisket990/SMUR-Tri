@@ -98,8 +98,11 @@ export const CONFIG = {
   },
 
   // --- Ambiance : bulles de BD et téléphones (options activables dans le menu) ---
+  // Musique d'ambiance pendant la partie (sons/musique/ambiance[-scénario].mp3)
+  music: { volume: 0.35 },   // volume par défaut (réglable dans ⚙ Options)
+
   ambience: {
-    defaults: { bubbles: true, phones: true, sound: true, outside: true, cine: true },
+    defaults: { bubbles: true, phones: true, sound: true, outside: true, cine: true, music: true },
     volume: 0.6,
     //  Vos sonneries MP3 : déposez-les dans jeu/SMUR-Tri/sons/ sous les noms
     //  sonnerie-01.mp3, sonnerie-02.mp3, sonnerie-03.mp3… (numérotation continue,

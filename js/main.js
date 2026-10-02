@@ -31,6 +31,7 @@ import { createSmurTeams } from './smurTeams.js';
 import { createPompiers } from './pompiers.js';
 import { createIntro } from './intro.js';
 import { primeCinematic, playCinematic, musicCtl } from './cinematique.js';
+import { createMusic } from './musique.js';
 import { setupScrollHints } from './scrollhint.js';
 import { drawZoneLight } from './orders.js';
 import { selectVictims } from './selection.js';
@@ -69,6 +70,7 @@ async function boot() {
   const history = createHistory();
   $('menu-history').addEventListener('click', () => history.open());
   const choice = await showMenu(scenarios);
+  const music = createMusic({ volume: choice.ambience.musicVol });
   // encore dans le clic « Lancer » : on prépare la vidéo et on débloque le son
   if (choice.ambience.cine) primeCinematic({ withMusic: choice.ambience.sound });
   $('loading').hidden = false;
@@ -463,7 +465,7 @@ async function boot() {
   if (!MPAP) renderer.addOverlay((ctx) => team.draw(ctx, camera, performance.now()));
   renderer.addOverlay((ctx) => amb.draw(ctx));
   addEventListener('keydown', (e) => {
-    if ((e.key === 'm' || e.key === 'M') && !e.target.closest?.('input')) sound.setMuted(!sound.muted);
+    if ((e.key === 'm' || e.key === 'M') && !e.target.closest?.('input')) { sound.setMuted(!sound.muted); music.setMuted(sound.muted); }
   });
 
   // 10. Boucle principale
@@ -474,6 +476,7 @@ async function boot() {
     const dt = Math.min(100, now - last); // onglet en veille : pas de saut géant
     last = now;
     updateSim(state, dt);
+    if (state.over && music.playing) music.stop(4);   // fin de partie : fondu de sortie
     if (state.clock.running) team.update(dt * CONFIG.clock.timeScale);
     evac.update();
     if (state.clock.running) rescuers.update();
@@ -531,11 +534,16 @@ async function boot() {
     voiceUrl: briefVoice,
     paper: cine,              // après la vidéo : le briefing s'écrit sur la feuille du fax
     music: musicCtl,
-    onEngage: () => { if (choice.ambience.sound && (choice.ambience.phones || choice.ambience.outside)) sound.unlock(); },
+    onEngage: () => {
+      if (choice.ambience.sound && (choice.ambience.phones || choice.ambience.outside)) sound.unlock();
+      if (choice.ambience.music && !MPAP) music.unlock();
+    },
   });
   state.clock.running = !MPAP;             // MPAP : le temps ne passe pas (pas d'aggravation)
   logEvent(state, 'start', { scenario: scenario.id });
   if (!MPAP) intro.start();
+  // musique d'ambiance : après le fondu de la musique de la vidéo
+  if (choice.ambience.music && !MPAP) setTimeout(() => { if (!state.over) music.start(scenario.dataId ?? scenario.id, 6); }, 1200);
 }
 
 // Nouvelle partie = retour au menu (nouvelle disposition)

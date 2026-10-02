@@ -167,7 +167,7 @@ export function showMenu(scenarios) {
 
   // ---------- options d'ambiance (mémorisées) ----------
   const opts = {};
-  for (const k of ['bubbles', 'phones', 'sound', 'outside', 'cine']) {
+  for (const k of ['bubbles', 'phones', 'sound', 'outside', 'cine', 'music']) {
     const box = $(`opt-${k}`);
     const saved = store.get(`smur.opt.${k}`);
     box.checked = saved == null ? CONFIG.ambience.defaults[k] ?? true : saved === '1';
@@ -176,9 +176,20 @@ export function showMenu(scenarios) {
   // « Sons » est l'interrupteur général : sonneries (si téléphones) et sirènes/radio
   const syncSound = () => {
     const off = !opts.sound.checked;
-    opts.outside.disabled = off;
-    opts.outside.closest('label').classList.toggle('off', off);
+    for (const k of ['outside', 'music']) {
+      opts[k].disabled = off;
+      opts[k].closest('label').classList.toggle('off', off);
+    }
+    const volOff = off || !opts.music.checked;
+    musicVol.disabled = volOff;
+    musicVol.closest('label').classList.toggle('off', volOff);
   };
+  const musicVol = $('opt-music-vol');
+  musicVol.value = store.get('smur.opt.musicVol') ?? CONFIG.music.volume * 100;
+  const showVol = () => { $('opt-music-vol-out').textContent = `${musicVol.value} %`; };
+  showVol();
+  musicVol.addEventListener('input', () => { showVol(); store.set('smur.opt.musicVol', musicVol.value); });
+  opts.music.addEventListener('change', () => syncSound());
   opts.sound.addEventListener('change', syncSound);
   syncSound();
   // enregistrées dès qu'on les change (pas besoin de lancer une partie)
@@ -231,6 +242,8 @@ export function showMenu(scenarios) {
           sound: opts.sound.checked,
           outside: opts.sound.checked && opts.outside.checked,
           cine: opts.cine.checked,
+          music: opts.sound.checked && opts.music.checked,
+          musicVol: Number(musicVol.value) / 100,
         },
       });
     });
