@@ -499,6 +499,9 @@ async function boot() {
             if (first) feed(a, `retourne la fiche ${v.id}`, v.id);
             return null;
           }
+          case 'ready':
+            if (!a.ready) { a.ready = true; feed(a, 'a lu le briefing : prêt'); }
+            return null;
           case 'close':
             for (const x of state.victims) if (x.mpLook === a.pid) delete x.mpLook;
             a.doing = null;
@@ -745,6 +748,7 @@ async function boot() {
   if (authorized) window.sim.sound = sound;
   // téléphones : sonnerie seulement si les sons sont activés
   amb = createAmbience(state, camera, sound, { ...choice.ambience, sound: choice.ambience.sound && choice.ambience.phones, mouse });
+  if (authorized) window.sim.amb = amb;
   // sirènes avant chaque arrivée (équipes de brancardage, VL LOG avec SMUR) + radio
   const arrivals = [
     ...[...new Set((scenario.evacuation?.teams ?? []).map((g) => g.atMin))].map((m) => ({ atMs: m * 60000 })),
@@ -866,6 +870,34 @@ async function boot() {
 
   // 11. Briefing du scénario (le plan est déjà visible en fond), puis top chrono
   const cine = choice.ambience.cine ? await playCinematic() : false;
+  // multijoueur : le départ n'est donné que lorsque chaque joueur a lu le briefing
+  let mpWait = null;
+  if (HOST) {
+    const go = $('briefing-go');
+    const info = document.createElement('div');
+    info.className = 'mp-ready';
+    go.closest('.briefing-actions').after(info);
+    let armed = false, forced = false;
+    const team = () => [...mpHost.avatars.values()].filter((a) => !(a.age > 6));
+    const allReady = () => team().length > 0 && team().every((a) => a.ready);
+    go.textContent = 'Donner le départ ▸';
+    go.addEventListener('click', (e) => {
+      if (forced || allReady()) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      armed = true;
+    }, true);
+    const tick = () => {
+      const t = team(), ok = t.filter((a) => a.ready);
+      const waiting = t.filter((a) => !a.ready).map((a) => escH(a.name)).join(', ');
+      info.innerHTML = `<b>Joueurs prêts : ${ok.length}/${t.length}</b>${waiting ? ` · encore au briefing : ${waiting}` : ''}
+        ${armed && !allReady() ? '<br>Départ automatique dès que tous sont prêts…' : ''}
+        ${!allReady() ? ' <button type="button" class="mp-force">Démarrer sans attendre</button>' : ''}`;
+      info.querySelector('.mp-force')?.addEventListener('click', () => { forced = true; go.click(); });
+      if (armed && allReady()) { forced = true; go.click(); return; }
+      mpWait = setTimeout(tick, 400);
+    };
+    tick();
+  }
   await showBriefing(fillBriefing(scenario, { count: entries.length, stock, player }), {
     voiceUrl: briefVoice,
     paper: cine,              // après la vidéo : le briefing s'écrit sur la feuille du fax
@@ -875,6 +907,27 @@ async function boot() {
       if (choice.ambience.music && !MPAP) music.unlock();
     },
   });
+  clearTimeout(mpWait);
+  document.querySelector('.mp-ready')?.remove();
+  if (PLAYER) {
+    // prêt : on attend le départ donné par le formateur
+    mpSend({ t: 'ready' });
+    if (!state.mpRunning) {
+      const w = document.createElement('div');
+      w.className = 'mp-waiting';
+      document.body.appendChild(w);
+      await new Promise((resolve) => {
+        const tick = () => {
+          if (state.mpRunning) { w.remove(); return resolve(); }
+          const t = [mpPlayer.me, ...mpPlayer.others].filter(Boolean);
+          const ok = t.filter((a) => a.ready);
+          w.innerHTML = `<div><b>Vous êtes prêt.</b><br>En attente des autres joueurs et du départ donné par le formateur…<br><span>${ok.length}/${t.length} prêts${t.filter((a) => !a.ready).length ? ` · encore au briefing : ${t.filter((a) => !a.ready).map((a) => escH(a.name)).join(', ')}` : ''}</span></div>`;
+          setTimeout(tick, 300);
+        };
+        tick();
+      });
+    }
+  }
   if (HOST) mpHost.splitBags();
   state.clock.running = !MPAP && !PLAYER;  // MPAP : le temps ne passe pas ; joueur réseau : temps de l'hôte
   logEvent(state, 'start', { scenario: scenario.id, real: REAL, mp: MP?.role ?? null });

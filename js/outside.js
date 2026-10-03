@@ -12,7 +12,7 @@ export function createOutside(state, sound, arrivals, { leadSec = 25 } = {}) {
   let nextDistant = rand(30, 60) * 1000;
 
   function update() {
-    if (!state.clock.running || state.over) return;
+    if (!(state.clock.running || state.mpRunning) || state.over) return;
     const t = state.clock.elapsedMs;
     for (const a of pending) {
       if (!a.done && t >= a.atMs - leadSec * 1000) {

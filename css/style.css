@@ -831,3 +831,9 @@ body.editor-open { overflow: hidden; }
 .mp-db { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
 .mp-db th, .mp-db td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; }
 .mp-db th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.mp-ready { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(34,176,125,.10); border: 1px solid #1f4d3c; font-size: 13px; line-height: 1.5; }
+.briefing.paper .mp-ready { background: rgba(0,0,0,.05); border-color: #cfc9b8; color: #1d1c1a; }
+.mp-force { margin-left: 6px; font-size: 12px; padding: 2px 10px; }
+.mp-waiting { position: fixed; inset: 0; z-index: 36; display: grid; place-items: center; background: rgba(5,6,9,.72); }
+.mp-waiting > div { background: #0d0f13; border: 1px solid #1f4d3c; border-radius: 12px; padding: 18px 24px; text-align: center; line-height: 1.6; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+.mp-waiting span { color: var(--muted); font-size: 13px; }

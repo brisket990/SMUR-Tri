@@ -68,7 +68,7 @@ export function createAmbience(state, camera, sound, opts) {
 
   function update(dtMs) {
     const now = state.clock.elapsedMs;
-    const active = state.clock.running && !state.over;
+    const active = (state.clock.running || state.mpRunning) && !state.over;   // joueur réseau : temps de l'hôte
     for (let i = bubbles.length - 1; i >= 0; i--) {
       const b = bubbles[i];
       if (!active || now - b.born > b.life || (!b.phone && b.v.status === 'DEAD') || b.v.evac?.state === 'pma') {

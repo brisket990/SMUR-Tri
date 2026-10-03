@@ -221,7 +221,7 @@ export function createHost({ state, makeTeam, onPlayers, applyInput, extra }) {
           ty: tg ? Math.round(tg.victim ? tg.victim.y : tg.y) : null,
           vid: tg?.victim?.id ?? null,
           m: Math.round(a.t.team.walkedM),
-          inv: a.inv, doing: a.doing, res: a.results.slice(-12),
+          inv: a.inv, doing: a.doing, res: a.results.slice(-12), ready: !!a.ready,
         };
       }),
       victims: victimsDelta(tick % 50 === 1),        // tout, de temps en temps (sécurité)
