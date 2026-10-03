@@ -25,12 +25,19 @@ export function createSmurTeams(state, scenario, plan, { playerTeam, evac } = {}
   const hostBlock = document.getElementById('hud-smur-block');
   const now = () => state.clock.elapsedMs;
 
-  function spawn(fromLabel) {
+  function spawn(fromLabel, forcedId = null) {
     const tm = {
-      id: `SMUR ${++n}`, from: fromLabel, x: entry[0] * plan.w, y: entry[1] * plan.h,
+      id: forcedId ?? `SMUR ${++n}`, from: fromLabel, x: entry[0] * plan.w, y: entry[1] * plan.h,
       target: null, busyUntil: 0, task: 'arrivée', sector: '', triaged: 0, cares: 0, evacs: 0,
     };
     teams.push(tm);
+    tm.setSector = (z) => {
+      tm.sector = z;
+      tm.doneNote = '';
+      if (tm.target && tm.sector && tm.target.zone !== tm.sector) tm.target = null;
+      tm.picker?.set(z);
+      logEvent(state, 'smur-sector', { team: tm.id, sector: tm.sector || 'auto' });
+    };
     logEvent(state, 'smur-arrive', { team: tm.id, with: fromLabel });
     // ligne dans le tableau de bord, avec choix du secteur
     if (host) {
@@ -42,10 +49,8 @@ export function createSmurTeams(state, scenario, plan, { playerTeam, evac } = {}
       tm.picker = createOrderPicker({
         zones: scenario.zones ?? [], team: tm.id,
         onPick: (z) => {
-          tm.sector = z;
-          tm.doneNote = '';
-          if (tm.target && tm.sector && tm.target.zone !== tm.sector) tm.target = null;
-          logEvent(state, 'smur-sector', { team: tm.id, sector: tm.sector || 'auto' });
+          if (state.mpRoute) return state.mpRoute({ t: 'cmd', mod: 'smur', id: tm.id, z });   // multijoueur
+          tm.setSector(z);
         },
       });
       li.appendChild(tm.picker.el);
@@ -155,5 +160,8 @@ export function createSmurTeams(state, scenario, plan, { playerTeam, evac } = {}
     }
   }
 
-  return { update, draw, teams };
+  /** multijoueur (poste joueur) : crée l'équipe arrivée chez le formateur */
+  function ensure(id, from) { return teams.find((t) => t.id === id) ?? (spawn(from, id), teams[teams.length - 1]); }
+
+  return { update, draw, teams, ensure };
 }

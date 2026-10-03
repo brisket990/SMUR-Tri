@@ -12,7 +12,7 @@ import { updateSim } from './sim.js';
 import { Camera } from './camera.js';
 import { attachInput } from './input.js';
 import { createRenderer, pickVictim } from './renderer.js';
-import { createHud } from './hud.js';
+import { createHud, formatTime } from './hud.js';
 import { createModal } from './modal.js';
 import { createDebrief } from './debrief.js';
 import { initEvolution, applyCare, judgeTriage, expectedTriage } from './evolution.js';
@@ -33,7 +33,7 @@ import { createIntro } from './intro.js';
 import { primeCinematic, playCinematic, musicCtl } from './cinematique.js';
 import { createMusic } from './musique.js';
 import { setReal, realizeVictim } from './realmode.js';
-import { createHost, createPlayer, ROLES } from './multi.js';
+import { createHost, createPlayer, ROLES, drawLook } from './multi.js';
 import { setupScrollHints } from './scrollhint.js';
 import { drawZoneLight } from './orders.js';
 import { selectVictims } from './selection.js';
@@ -280,7 +280,11 @@ async function boot() {
   state.team = team.team;
   if (PLAYER) { team.team.color = ROLES[MP.myRole]?.color; team.team.label = ROLES[MP.myRole]?.short ?? 'SMUR'; }
   let mpHost = null, mpPlayer = null, mpPending = null;
-  const mpRefuse = () => ({ ok: false, kind: 'impossible', message: 'Multijoueur (étape 1) : déplacements et lecture des fiches seulement. Tri et gestes partagés : étape suivante.' });
+  const mpPendingKey = new Map();            // n° d'action → geste (pour afficher le résultat)
+  const hostOnly = () => ({ ok: false, kind: 'impossible', message: 'Écran du formateur : observation seulement. Les joueurs agissent depuis leur poste.' });
+  const mpSend = (msg, key = null) => { const rid = mpPlayer.send(msg); if (key) mpPendingKey.set(rid, key); return rid; };
+  const SENT = { ok: true, message: '…' };
+  if (PLAYER) for (const k of Object.keys(state.inventory)) state.inventory[k] = 0;   // le sac arrive du formateur
   state.evacSummary = evac.summary;
   const rescuers = createRescuers(state, scenario, {
     onAlert: (v) => amb?.alert(v, 'Docteur ! Elle s\'aggrave !'),
@@ -322,7 +326,8 @@ async function boot() {
     evac,
     rescuers,
     onRescuer: (id, what) => {
-      if (MP) return mpRefuse();
+      if (HOST) return hostOnly();
+      if (PLAYER) { mpSend({ t: 'rescuer', vid: id, what }, 'rescuer'); return SENT; }
       const v = state.byId.get(id);
       const res = what === 'free' ? rescuers.release(v) : rescuers.post(v);
       hud.update(state);
@@ -330,19 +335,28 @@ async function boot() {
     },
     onEvac: (id, mode) => {
       const v = state.byId.get(id);
-      if (MP) return mpRefuse();
+      if (HOST) return hostOnly();
+      if (PLAYER) { mpSend({ t: 'evac', vid: id, mode }, 'evac'); return SENT; }
       const res = mode === 'walk' ? evac.walk(v) : mode === 'cancel' ? evac.cancel(v) : mode === 'priority' ? evac.prioritize(v) : mode === 'pma' ? evac.sendToPMA(v) : evac.requestStretcher(v);
       hud.update(state);
       return res;
     },
-    onTriage: (id, cat) => (MP ? mpRefuse() : assignTriage(state, id, cat, judgeTriage, expectedTriage)),
+    onTriage: (id, cat) => {
+      if (HOST) return hostOnly();
+      if (PLAYER) { const v = state.byId.get(id); if (v) v.assignedTriage = cat; mpSend({ t: 'triage', vid: id, cat }); return undefined; }
+      return assignTriage(state, id, cat, judgeTriage, expectedTriage);
+    },
     onCare: (id, action) => {
-      if (MP) return mpRefuse();
+      if (HOST) return hostOnly();
+      if (PLAYER) { mpSend({ t: 'care', vid: id, action }, action); return SENT; }
       const res = applyCare(state, state.byId.get(id), action);
       hud.update(state);
       return res;
     },
-    onClose: () => { if (CONFIG.clock.pauseOnModal && !MPAP) state.clock.running = true; },
+    onClose: () => {
+      if (PLAYER) mpSend({ t: 'close' });
+      if (CONFIG.clock.pauseOnModal && !MPAP) state.clock.running = true;
+    },
     // Mode non autorisé : la carte retournée révèle une menace → mort
     onRevealed: (v) => {
       if (authorized || v?.decoy) return true;       // fiche leurre : jouable
@@ -388,6 +402,13 @@ async function boot() {
       if (MPAP) { if (v) examine(v); return; }      // MPAP : pas de déplacement
       if (HOST) { if (v) examine(v); return; }       // formateur : observe tout, sans se déplacer
       if (PLAYER) {
+        const dp = depotPos();
+        const [dsx, dsy] = camera.worldToScreen(dp.x, dp.y);
+        if (!v && Math.hypot(sx - dsx, sy - dsy) < 24 && depotTotal() > 0) {
+          if (Math.hypot(team.team.x - dp.x, team.team.y - dp.y) <= team.team.reach * 1.5) mpSend({ t: 'pickup' }, 'pickup');
+          else { mpSend({ t: 'goto', x: dp.x, y: dp.y }); team.team.target = { x: dp.x, y: dp.y }; }
+          return;
+        }
         if (v && team.inReach(v)) { examine(v); return; }
         mpPending = v ?? null;
         mpPlayer.send(v ? { t: 'goto', x: v.x, y: v.y, vid: v.id } : { t: 'goto', x: wx, y: wy });
@@ -416,7 +437,7 @@ async function boot() {
   }
   function examine(v) {
     team.stop();
-    if (PLAYER) { mpPending = null; mpPlayer.send({ t: 'stop' }); }
+    if (PLAYER) { mpPending = null; mpSend({ t: 'stop' }); mpSend({ t: 'look', vid: v.id }); }
     if (!authorized && v.seenAt == null && !v.decoy && decoyUsed < decoyMax && leurres.length && cardOpts) makeDecoy(v);
     const firstLook = (v.seenAt == null && !!v.back) || (!authorized && !v.decoy) || (v.decoy && v.seenAt == null);
     markSeen(state, v.id);
@@ -426,6 +447,16 @@ async function boot() {
   team.onArrive = (v) => { if (!modal.isOpen() && !state.over) examine(v); };
 
   // ---------- multijoueur ----------
+  const mpStart = scenario.team?.start ?? [0.5, 0.9];
+  const depotPos = () => ({ x: mpStart[0] * plan.w + 40, y: mpStart[1] * plan.h });     // matériel des renforts : à l'entrée
+  let depotRemote = {};
+  const depotInv = () => (HOST ? state.inventory : depotRemote);
+  const depotTotal = () => Object.values(depotInv()).reduce((s, q) => s + (Number.isFinite(q) ? q : 0), 0);
+  const TRI = { RED: 'UA', YELLOW: 'UR', GREEN: 'Impliqué', BLACK: 'UD' };
+  const itemShort = (k) => CONFIG.items[k]?.short ?? k;
+  const mpFeed = [];
+  const escH = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtT = (ms) => formatTime(ms ?? 0);
   if (HOST || PLAYER) {
     const panel = document.createElement('div');
     panel.className = 'mp-hud';
@@ -433,35 +464,240 @@ async function boot() {
     const banner = document.createElement('div');
     banner.className = 'mp-banner'; banner.hidden = true;
     document.body.appendChild(banner);
-    const escH = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    const row = (a, me) => {
-      const r = ROLES[a.role] ?? ROLES.med;
-      return `<li><span class="mp-badge" style="background:${r.color}">${r.short}</span><b>${escH(a.name || r.label)}</b>${me ? ' <span class="muted">(vous)</span>' : ''}${a.lost ? ' <span class="mp-lost">déconnecté</span>' : ''}<span class="mp-m">${a.m ?? 0} m</span></li>`;
+    const toastEl = document.createElement('div');
+    toastEl.className = 'mp-toast'; toastEl.hidden = true;
+    document.body.appendChild(toastEl);
+    let toastTimer = null;
+    const toast = (txt, warn = false) => {
+      toastEl.textContent = txt; toastEl.hidden = false; toastEl.classList.toggle('warn', warn);
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.hidden = true; }, 3500);
     };
+    const badge = (role) => { const r = ROLES[role] ?? ROLES.med; return `<span class="mp-badge" style="background:${r.color}">${r.short}</span>`; };
+    const feedHTML = (list) => list.slice(-10).reverse().map((e) => `<li><span class="mp-t">${fmtT(e.t)}</span>${badge(e.role)}<b>${escH(e.name)}</b> ${escH(e.text)}</li>`).join('');
+    const bagTxt = (inv) => Object.entries(inv ?? {}).filter(([, q]) => q > 0).map(([k, q]) => `${itemShort(k)} ${q}`).join(' · ') || 'sac vide';
+
     if (HOST) {
+      if ($('hud-inventory')) $('hud-inventory').previousElementSibling.textContent = 'Dépôt (entrée) : renforts logistiques';
+      const feed = (a, text, vid = null) => {
+        const e = { t: state.clock.elapsedMs, pid: a.pid, name: a.name, role: a.role, text };
+        mpFeed.push(e); mpFeed.splice(0, Math.max(0, mpFeed.length - 60));
+        logEvent(state, 'mp', { pid: a.pid, name: a.name, role: a.role, text, id: vid });
+      };
+      const near = (a, b, m) => Math.hypot(a.t.team.x - b.t.team.x, a.t.team.y - b.t.team.y) <= m * pxPerM;
+      const applyInput = (a, msg) => {
+        const v = msg.vid ? state.byId.get(msg.vid) : null;
+        switch (msg.t) {
+          case 'look': {
+            if (!v) return null;
+            const first = v.seenAt == null;
+            markSeen(state, v.id);
+            v.seenBy ??= a.name;
+            for (const x of state.victims) if (x.mpLook === a.pid) delete x.mpLook;
+            v.mpLook = a.pid;
+            a.stats.seen.add(v.id);
+            a.doing = `fiche ${v.id}`;
+            if (first) feed(a, `retourne la fiche ${v.id}`, v.id);
+            return null;
+          }
+          case 'close':
+            for (const x of state.victims) if (x.mpLook === a.pid) delete x.mpLook;
+            a.doing = null;
+            return null;
+          case 'triage': {
+            if (!v || !TRI[msg.cat]) return null;
+            const prev = v.assignedTriage, prevWho = v.triageHistory.at(-1)?.who;
+            assignTriage(state, v.id, msg.cat, judgeTriage, expectedTriage);
+            const h = v.triageHistory.at(-1);
+            if (h) { h.pid = a.pid; h.who = a.name; }
+            v.triagedByPid = a.pid;
+            a.stats.triage++;
+            feed(a, `trie ${v.id} → ${TRI[msg.cat]}${prev && prev !== msg.cat ? ` (était ${TRI[prev]}${prevWho && prevWho !== a.name ? ` par ${prevWho}` : ''})` : ''}`, v.id);
+            return null;
+          }
+          case 'care': {
+            if (!v || !CONFIG.items[msg.action]) return null;
+            if (msg.action === 'needle' && a.role !== 'med') { a.stats.refused++; return { ok: false, kind: 'impossible', message: "Exsufflation : geste réservé au médecin." }; }
+            const saved = state.inventory;
+            state.inventory = a.inv;               // le geste puise dans le sac de ce joueur
+            let res;
+            try { res = applyCare(state, v, msg.action); } finally { state.inventory = saved; }
+            if (res?.ok !== false) {
+              const last = v.careLog.at(-1);
+              if (last) last.who = a.name;
+              a.stats.care++;
+              feed(a, `${itemShort(msg.action).toLowerCase()} sur ${v.id}`, v.id);
+            }
+            return res;
+          }
+          case 'evac': {
+            if (!v) return null;
+            const m = msg.mode;
+            const res = m === 'walk' ? evac.walk(v) : m === 'cancel' ? evac.cancel(v) : m === 'priority' ? evac.prioritize(v) : m === 'pma' ? evac.sendToPMA(v) : evac.requestStretcher(v);
+            if (res?.ok !== false) feed(a, { walk: `envoie ${v.id} à pied`, cancel: `annule l'évacuation de ${v.id}`, priority: `${v.id} prioritaire`, pma: `${v.id} au PMA` }[m] ?? `demande un brancard pour ${v.id}`, v.id);
+            return res;
+          }
+          case 'rescuer': {
+            if (!v) return null;
+            const res = msg.what === 'free' ? rescuers.release(v) : rescuers.post(v);
+            if (res?.ok) feed(a, msg.what === 'free' ? `libère le secouriste de ${v.id}` : `poste un secouriste auprès de ${v.id}`, v.id);
+            return res;
+          }
+          case 'give': {
+            const b = mpHost.avatars.get(msg.to);
+            const k = msg.item;
+            if (!b || !CONFIG.items[k]) return { ok: false, message: 'Destinataire inconnu.' };
+            if (!near(a, b, 5)) return { ok: false, message: `${b.name} est trop loin (à moins de 5 m pour donner du matériel).` };
+            if (!((a.inv[k] ?? 0) > 0)) return { ok: false, message: `Plus de ${itemShort(k).toLowerCase()} dans votre sac.` };
+            a.inv[k]--; b.inv[k] = (b.inv[k] ?? 0) + 1;
+            a.stats.given++;
+            b.results.push([`gift-${a.pid}-${state.clock.elapsedMs}-${k}`, { ok: true, gift: true, message: `${a.name} vous donne 1 ${CONFIG.items[k].label.toLowerCase()}.` }]);
+            feed(a, `donne 1 ${itemShort(k).toLowerCase()} à ${b.name}`);
+            return { ok: true, message: `1 ${CONFIG.items[k].label.toLowerCase()} donné à ${b.name}.` };
+          }
+          case 'pickup': {
+            const dp = depotPos();
+            if (Math.hypot(a.t.team.x - dp.x, a.t.team.y - dp.y) > a.t.team.reach * 1.6) return { ok: false, message: 'Trop loin du dépôt.' };
+            let n = 0;
+            for (const [k, q] of Object.entries(state.inventory)) {
+              if (!(q > 0) || !Number.isFinite(q)) continue;
+              a.inv[k] = (a.inv[k] ?? 0) + q; n += q; state.inventory[k] = 0;
+            }
+            if (!n) return { ok: false, message: 'Dépôt vide.' };
+            feed(a, `récupère ${n} articles au dépôt`);
+            return { ok: true, message: `${n} articles ajoutés à votre sac.` };
+          }
+          case 'cmd': {
+            if (msg.mod === 'sp' || msg.mod === 'smur') {
+              const tm = (msg.mod === 'sp' ? pompiers.teams : smur.teams).find((t) => t.id === msg.id);
+              if (!tm) return null;
+              tm.setSector(msg.z);
+              const z = (scenario.zones ?? []).find((x) => x.id === msg.z);
+              feed(a, `ordre à ${tm.id} : ${z ? z.label : 'autonome'}`);
+              return null;
+            }
+            if (msg.mod === 'sp-give') {
+              const tm = pompiers.teams.find((t) => t.id === msg.id);
+              if (!tm) return null;
+              const got = tm.giveTo(a.inv);
+              const n = Object.values(got).reduce((x, q) => x + q, 0);
+              feed(a, n ? `reçoit ${n} articles de ${tm.id}` : `${tm.id} n'a plus rien à donner`);
+              return { ok: !!n, message: n ? `${tm.id} : +${n} articles dans votre sac.` : `${tm.id} : plus rien à donner.` };
+            }
+            return null;
+          }
+          default: return null;
+        }
+      };
       mpHost = createHost({
         state,
         makeTeam: () => createTeam(state, scenario, plan),
+        applyInput,
+        extra: (codec) => ({
+          depot: state.inventory,
+          feed: mpFeed.slice(-12),
+          evacTeams: (state.evac?.teams ?? []).map((t) => codec.enc(t)),
+          evacQueue: (state.evac?.queue ?? []).map((v) => v.id),
+          sp: pompiers.teams.map((t) => ({ ...codec.enc(t), elText: t.el?.textContent ?? '' })),
+          smur: smur.teams.map((t) => ({ ...codec.enc(t), elText: t.el?.textContent ?? '' })),
+          resc: (state.rescuers ?? []).map((r) => codec.enc(r)),
+          logi: state.logistics.map((l) => ({ arrived: !!l.arrived, smurSpawned: !!l.smurSpawned })),
+        }),
         onPlayers: (list) => {
-          panel.innerHTML = `<h4>Équipe sur le terrain (${list.length})</h4><ul class="mp-list">${list.map((a) => row({ ...a, lost: a.age > 6, m: Math.round(a.t.team.walkedM) })).join('') || '<li class="muted">Aucun joueur</li>'}</ul>`;
+          panel.innerHTML = `<h4>Équipe sur le terrain (${list.length})</h4><ul class="mp-list">${list.map((a) => `<li>${badge(a.role)}<b>${escH(a.name)}</b>${a.age > 6 ? ' <span class="mp-lost">déconnecté</span>' : ''}${a.doing ? ` <span class="mp-doing">${escH(a.doing)}</span>` : ''}<span class="mp-m">${Math.round(a.t.team.walkedM)} m</span></li><li class="mp-bag">${escH(bagTxt(a.inv))}</li>`).join('') || '<li class="muted">Aucun joueur</li>'}</ul>
+            <h4>En direct</h4><ul class="mp-feed">${feedHTML(mpFeed) || '<li class="muted">—</li>'}</ul>`;
           banner.hidden = mpHost.online;
           banner.textContent = 'Serveur injoignable : la fenêtre du serveur est-elle encore ouverte ?';
         },
       });
+      // répartition des sacs au top départ : à parts égales, exsufflation au(x) médecin(s)
+      mpHost.splitBags = () => {
+        const list = [...mpHost.avatars.values()].filter((a) => !(a.age > 6));
+        if (!list.length) return;
+        for (const [k, q] of Object.entries(state.inventory)) {
+          if (!Number.isFinite(q) || q <= 0) continue;
+          let order = list;
+          if (k === 'needle') order = list.filter((a) => a.role === 'med');
+          else if (k === 'oxygen') order = [...list.filter((a) => a.role !== 'med'), ...list.filter((a) => a.role === 'med')];
+          if (!order.length) continue;
+          for (let i = 0; i < q; i++) { const a = order[i % order.length]; a.inv[k] = (a.inv[k] ?? 0) + 1; }
+          state.inventory[k] = 0;
+        }
+        logEvent(state, 'mp-bags', { bags: list.map((a) => ({ name: a.name, inv: { ...a.inv } })) });
+      };
+      state.mpTeam = () => [...mpHost.avatars.values()].map((a) => ({ name: a.name, role: a.role, seen: a.stats.seen.size, triage: a.stats.triage, care: a.stats.care, given: a.stats.given, refused: a.stats.refused, m: Math.round(a.t.team.walkedM) }));
       mpHost.start();
       addEventListener('pagehide', () => navigator.sendBeacon?.('/mp/host/stop', '{}'));
     } else {
+      let giftOpen = null, lastPanel = 0, endShown = false;
+      const inv0 = Object.keys(state.inventory);
       mpPlayer = createPlayer({
         pid: MP.pid, state, team,
+        onVictims: () => { hud.update(state); },
+        onResult: (rid, res) => {
+          if (res.ok && !res.message) return;
+          const key = mpPendingKey.get(rid);
+          mpPendingKey.delete(rid);
+          if (modal.isOpen() && key && !res.gift) modal.toast(res, key);
+          else toast(res.message ?? (res.ok === false ? 'Impossible.' : 'Fait.'), res.ok === false);
+          hud.update(state);
+        },
         onState: (s, me, others, info) => {
+          const codec = info.codec;
+          // sac personnel, dépôt, équipes, brancardage, secouristes
+          const inv = {};
+          for (const k of inv0) inv[k] = me?.inv?.[k] ?? 0;
+          state.inventory = inv;
+          depotRemote = s.depot ?? {};
+          (s.evacTeams ?? []).forEach((d, i) => { const tm = state.evac?.teams?.[i]; if (tm) Object.assign(tm, codec.dec(d)); });
+          if (s.evacQueue && state.evac) state.evac.queue.splice(0, state.evac.queue.length, ...s.evacQueue.map((id) => state.byId.get(id)).filter(Boolean));
+          const mirror = (tm, d) => {
+            const { elText, ...rest } = d;
+            Object.assign(tm, codec.dec(rest));
+            if (tm.el) tm.el.textContent = elText;
+            if (tm.picker && tm.picker.get() !== (tm.sector ?? '')) tm.picker.set(tm.sector ?? '');
+            tm.refreshGive?.();
+          };
+          (s.sp ?? []).forEach((d) => { const tm = pompiers.teams.find((t) => t.id === d.id); if (tm) mirror(tm, d); });
+          (s.smur ?? []).forEach((d) => mirror(smur.ensure(d.id, d.from), d));
+          (s.resc ?? []).forEach((d, i) => { if (state.rescuers?.[i]) Object.assign(state.rescuers[i], codec.dec(d)); });
+          (s.logi ?? []).forEach((d, i) => { if (state.logistics[i]) Object.assign(state.logistics[i], d); });
+          if (s.over && !endShown) {
+            endShown = true; state.over = true;
+            if (modal.isOpen()) modal.close();
+            banner.hidden = false; banner.textContent = 'Partie terminée : bilan sur l\'écran du formateur (touche B pour votre bilan).';
+          }
           if (mpPending && team.inReach(mpPending) && !modal.isOpen()) examine(mpPending);
-          panel.innerHTML = `<h4>Votre équipe</h4><ul class="mp-list">${me ? row(me, true) : ''}${others.map((a) => row(a)).join('')}</ul>`;
+          // panneau équipe (2 fois par seconde : les boutons restent cliquables)
+          const now = performance.now();
+          if (now - lastPanel > 500) {
+            lastPanel = now;
+            const dist = (a) => (me ? Math.hypot(a.x - me.x, a.y - me.y) / pxPerM : 99);
+            const myBag = Object.entries(state.inventory).filter(([, q]) => q > 0);
+            panel.innerHTML = `<h4>Votre équipe</h4><ul class="mp-list">
+              ${me ? `<li>${badge(me.role)}<b>${escH(me.name)}</b> <span class="muted">(vous)</span><span class="mp-m">${me.m} m</span></li>` : ''}
+              ${others.map((a) => {
+                const ok = dist(a) <= 5 && !a.lost;
+                return `<li>${badge(a.role)}<b>${escH(a.name)}</b>${a.lost ? ' <span class="mp-lost">déconnecté</span>' : a.doing ? ` <span class="mp-doing">${escH(a.doing)}</span>` : ''}<span class="mp-m">${Math.round(dist(a))} m</span>
+                  <button type="button" class="mp-gift" data-gift="${a.pid}" ${ok && myBag.length ? '' : 'disabled'} title="${ok ? 'Donner du matériel' : 'À moins de 5 m pour donner du matériel'}">🎁</button></li>
+                  ${giftOpen === a.pid && ok ? `<li class="mp-giftlist">${myBag.map(([k, q]) => `<button type="button" data-give="${k}" data-to="${a.pid}">${escH(itemShort(k))} <b>×${q}</b></button>`).join('')}</li>` : ''}`;
+              }).join('')}</ul>
+              ${depotTotal() ? `<p class="mp-depot">📦 Dépôt à l'entrée : ${depotTotal()} articles (cliquer le dépôt sur le plan)</p>` : ''}
+              <h4>En direct</h4><ul class="mp-feed">${feedHTML(s.feed ?? []) || '<li class="muted">—</li>'}</ul>`;
+          }
           if (!info.hostOnline) { banner.hidden = false; banner.textContent = 'Écran du formateur fermé : la partie est en attente.'; }
           else if (info.gen) { banner.hidden = false; banner.textContent = 'Le formateur a lancé une nouvelle partie : revenez au menu (Menu → Multi).'; }
-          else banner.hidden = true;
+          else if (!endShown) banner.hidden = true;
         },
         onLost: (l) => { banner.hidden = !l; banner.textContent = 'Connexion au serveur perdue… reconnexion en cours'; },
       });
+      // boutons du panneau (pointerdown : le panneau se redessine souvent)
+      panel.addEventListener('pointerdown', (e) => {
+        const g = e.target.closest('[data-gift]');
+        if (g && !g.disabled) { giftOpen = giftOpen === g.dataset.gift ? null : g.dataset.gift; lastPanel = 0; return; }
+        const b = e.target.closest('[data-give]');
+        if (b) { mpSend({ t: 'give', to: b.dataset.to, item: b.dataset.give }, 'give'); }
+      });
+      state.mpRoute = (msg) => { mpSend(msg, msg.mod === 'sp-give' ? 'give' : null); };
       mpPlayer.start();
     }
   }
@@ -533,6 +769,27 @@ async function boot() {
   if (authorized) window.sim.intro = intro;
   renderer.addOverlay((ctx) => intro.draw(ctx));
   if (!MPAP && !HOST) renderer.addOverlay((ctx) => team.draw(ctx, camera, performance.now()));
+  if (HOST || PLAYER) {
+    renderer.addOverlay((ctx) => {
+      const now = performance.now();
+      // fiche en cours de lecture : anneau à la couleur du rôle
+      const roleOf = (pid) => (HOST ? mpHost.avatars.get(pid)?.role : (mpPlayer.others.find((a) => a.pid === pid) ?? mpPlayer.me)?.role);
+      for (const v of state.victims) if (v.mpLook && v.mpLook !== MP.pid) drawLook(ctx, camera, v, roleOf(v.mpLook), now);
+      // dépôt du matériel des renforts (entrée)
+      const n = depotTotal();
+      if (n > 0) {
+        const dp = depotPos();
+        const [x, y] = camera.worldToScreen(dp.x, dp.y);
+        ctx.save();
+        ctx.fillStyle = '#8d6e3f'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+        ctx.fillRect(x - 13, y - 11, 26, 22); ctx.strokeRect(x - 13, y - 11, 26, 22);
+        ctx.beginPath(); ctx.moveTo(x - 13, y - 3); ctx.lineTo(x + 13, y - 3); ctx.stroke();
+        ctx.font = '800 11px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#ffe0a3';
+        ctx.fillText(`Dépôt · ${n}`, x, y + 26);
+        ctx.restore();
+      }
+    });
+  }
   if (HOST) renderer.addOverlay((ctx) => mpHost.draw(ctx, camera, performance.now()));
   if (PLAYER) renderer.addOverlay((ctx) => mpPlayer.draw(ctx, camera, performance.now()));
   renderer.addOverlay((ctx) => amb.draw(ctx));
@@ -544,6 +801,7 @@ async function boot() {
   $('loading').remove();
   let last = performance.now();
   let hudTimer = 0;
+  let mpIntroStarted = false;
   function frame(now) {
     const dt = Math.min(100, now - last); // onglet en veille : pas de saut géant
     last = now;
@@ -551,6 +809,7 @@ async function boot() {
     if (state.over && music.playing) music.stop(4);   // fin de partie : fondu de sortie
     if (PLAYER) {
       mpPlayer.update(dt);                       // l'état vient de l'écran du formateur
+      if (state.mpRunning && !mpIntroStarted) { mpIntroStarted = true; intro.start(); }
     } else {
       if (state.clock.running && !HOST) team.update(dt * CONFIG.clock.timeScale);
       if (HOST) mpHost.update(dt * CONFIG.clock.timeScale);
@@ -616,6 +875,7 @@ async function boot() {
       if (choice.ambience.music && !MPAP) music.unlock();
     },
   });
+  if (HOST) mpHost.splitBags();
   state.clock.running = !MPAP && !PLAYER;  // MPAP : le temps ne passe pas ; joueur réseau : temps de l'hôte
   logEvent(state, 'start', { scenario: scenario.id, real: REAL, mp: MP?.role ?? null });
   if (!MPAP && !PLAYER) intro.start();

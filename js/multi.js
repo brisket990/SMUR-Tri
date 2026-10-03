@@ -93,6 +93,25 @@ export function drawAvatar(ctx, camera, a, { me = false, reach = 0, now = 0, los
   ctx.fillRect(sx - w / 2, sy + 19, w, 16);
   ctx.fillStyle = '#fff';
   ctx.fillText(label, sx, sy + 27.5);
+  if (a.doing) {
+    ctx.font = '600 11px system-ui, sans-serif';
+    const w2 = ctx.measureText(a.doing).width + 10;
+    ctx.fillStyle = hexA(role.color, 0.9);
+    ctx.fillRect(sx - w2 / 2, sy + 37, w2, 15);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(a.doing, sx, sy + 45);
+  }
+  ctx.restore();
+}
+
+/** Anneau autour de la fiche qu'un intervenant est en train de lire */
+export function drawLook(ctx, camera, v, role, now) {
+  const [sx, sy] = camera.worldToScreen(v.x, v.y);
+  const r = Math.max(v.w, v.h) * camera.zoom * 0.62 + 4 + Math.sin(now / 200) * 2;
+  ctx.save();
+  ctx.strokeStyle = (ROLES[role] ?? ROLES.med).color;
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.stroke();
   ctx.restore();
 }
 
@@ -101,14 +120,64 @@ function hexA(hex, a) {
   return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
 }
 
+// ------------------------------------------------------------ sérialisation
+//  Les objets du jeu se référencent (une équipe de brancardage porte « sa »
+//  victime…) : une victime devient { $v: id } à l'envoi et redevient l'objet
+//  du poste qui reçoit. Fonctions et éléments de page ne voyagent pas.
+const SKIP = new Set(['picker', 'el', 'giveBtn', 'li']);
+export function makeCodec(state) {
+  const isNode = (x) => typeof Node !== 'undefined' && x instanceof Node;
+  function enc(x, depth = 0) {
+    if (x == null || typeof x !== 'object') return typeof x === 'function' ? undefined : x;
+    if (x.id != null && state.byId.get(x.id) === x) return { $v: x.id };
+    if (isNode(x) || depth > 4) return undefined;
+    if (Array.isArray(x)) return x.map((y) => enc(y, depth + 1));
+    if (x instanceof Set) return [...x].map((y) => enc(y, depth + 1));
+    const o = {};
+    for (const [k, y] of Object.entries(x)) {
+      if (SKIP.has(k) || typeof y === 'function') continue;
+      const e = enc(y, depth + 1);
+      if (e !== undefined) o[k] = e;
+    }
+    return o;
+  }
+  function dec(x) {
+    if (x == null || typeof x !== 'object') return x;
+    if (Array.isArray(x)) return x.map(dec);
+    if ('$v' in x) return state.byId.get(x.$v) ?? null;
+    const o = {};
+    for (const [k, y] of Object.entries(x)) o[k] = dec(y);
+    return o;
+  }
+  return { enc, dec };
+}
+
+/** champs d'une victime qui changent en cours de partie (le reste est identique partout) */
+const VFIELDS = ['status', 'assignedTriage', 'triageJudgement', 'triageHistory', 'triagedAt', 'triagedBy', 'triagedByPid',
+  'seenAt', 'seenBy', 'care', 'careLog', 'position', 'garroted', 'x', 'y', 'evac', 'spFlag', 'guard', 'mpLook'];
+export function victimState(v, codec) {
+  const o = {};
+  for (const k of VFIELDS) if (v[k] !== undefined) o[k] = codec.enc(v[k]);
+  o.evo = { stage: v.evo?.stage ?? 0, frozen: !!v.evo?.frozen, frozenAt: v.evo?.frozenAt ?? null, byPMA: v.evo?.byPMA ?? null };
+  return o;
+}
+export function applyVictimState(v, d, codec) {
+  const { evo, ...rest } = d;
+  for (const [k, x] of Object.entries(rest)) v[k] = codec.dec(x);
+  if (evo && v.evo) Object.assign(v.evo, evo);
+}
+
 // ------------------------------------------------------------ hôte
 /**
  * Écran du formateur : fait vivre un intervenant par joueur, applique leurs
- * actions et publie l'état. makeTeam() crée un intervenant (team.js).
+ * actions (applyInput) et publie l'état : intervenants, victimes modifiées,
+ * équipes (extra()).
  */
-export function createHost({ state, makeTeam, onPlayers, applyInput }) {
-  const avatars = new Map();          // pid -> { pid, name, role, t (team), age }
-  let ack = 0, timer = null, online = true, lastOk = performance.now();
+export function createHost({ state, makeTeam, onPlayers, applyInput, extra }) {
+  const avatars = new Map();          // pid -> { pid, name, role, t (team), inv, doing, stats, results }
+  const codec = makeCodec(state);
+  const lastSent = new Map();         // id victime -> dernier état envoyé (texte)
+  let ack = 0, timer = null, online = true, lastOk = performance.now(), tick = 0;
 
   function ensure(list) {
     const seen = new Set();
@@ -117,10 +186,9 @@ export function createHost({ state, makeTeam, onPlayers, applyInput }) {
       let a = avatars.get(p.pid);
       if (!a) {
         const t = makeTeam();
-        // départ groupé, légèrement décalés pour ne pas se superposer
-        t.team.x += (i % 3 - 1) * 30;
-        t.team.y += Math.floor(i / 3) * 30;
-        a = { pid: p.pid, t };
+        t.team.x += (avatars.size % 3 - 1) * 30;          // départ groupé, sans superposition
+        t.team.y += Math.floor(avatars.size / 3) * 30;
+        a = { pid: p.pid, t, inv: {}, doing: null, results: [], stats: { seen: new Set(), triage: 0, care: 0, given: 0, refused: 0 } };
         avatars.set(p.pid, a);
       }
       Object.assign(a, { name: p.name, role: p.role, age: p.age });
@@ -128,7 +196,18 @@ export function createHost({ state, makeTeam, onPlayers, applyInput }) {
     for (const a of avatars.values()) if (!seen.has(a.pid)) a.age = 999;
   }
 
+  function victimsDelta(force) {
+    const out = {};
+    for (const v of state.victims) {
+      const d = victimState(v, codec);
+      const txt = JSON.stringify(d);
+      if (force || lastSent.get(v.id) !== txt) { out[v.id] = d; lastSent.set(v.id, txt); }
+    }
+    return out;
+  }
+
   function snapshot() {
+    tick++;
     return {
       t: Math.round(state.clock.elapsedMs),
       running: state.clock.running,
@@ -142,8 +221,11 @@ export function createHost({ state, makeTeam, onPlayers, applyInput }) {
           ty: tg ? Math.round(tg.victim ? tg.victim.y : tg.y) : null,
           vid: tg?.victim?.id ?? null,
           m: Math.round(a.t.team.walkedM),
+          inv: a.inv, doing: a.doing, res: a.results.slice(-12),
         };
       }),
+      victims: victimsDelta(tick % 50 === 1),        // tout, de temps en temps (sécurité)
+      ...(extra?.(codec) ?? {}),
     };
   }
 
@@ -159,21 +241,30 @@ export function createHost({ state, makeTeam, onPlayers, applyInput }) {
         if (!a) continue;
         if (msg.t === 'goto') a.t.goTo(msg.x, msg.y, msg.vid ? state.byId.get(msg.vid) ?? null : null);
         else if (msg.t === 'stop') a.t.stop();
-        else applyInput?.(a, msg);
+        else {
+          let res;
+          try { res = applyInput?.(a, msg); } catch (e) { console.error(e); res = { ok: false, message: 'Erreur côté formateur.' }; }
+          if (msg.rid != null && res) a.results.push([msg.rid, res]);
+        }
       }
       onPlayers?.([...avatars.values()]);
     } catch {
       online = performance.now() - lastOk < 3000;
+      lastSent.clear();                               // renvoyer tout au retour du serveur
     }
     timer = setTimeout(sync, 100);
   }
 
   return {
     avatars,
+    codec,
     start() { if (!timer) sync(); },
     update(dtMs) { if (state.clock.running) for (const a of avatars.values()) a.t.update(dtMs); },
     draw(ctx, camera, now) {
-      for (const a of avatars.values()) drawAvatar(ctx, camera, { ...a.t.team, tx: a.t.team.target ? (a.t.team.target.victim?.x ?? a.t.team.target.x) : null, ty: a.t.team.target ? (a.t.team.target.victim?.y ?? a.t.team.target.y) : null, name: a.name, role: a.role }, { reach: a.t.team.reach, now, lost: a.age > 6 });
+      for (const a of avatars.values()) {
+        const tg = a.t.team.target;
+        drawAvatar(ctx, camera, { ...a.t.team, tx: tg ? (tg.victim?.x ?? tg.x) : null, ty: tg ? (tg.victim?.y ?? tg.y) : null, name: a.name, role: a.role, doing: a.doing }, { reach: a.t.team.reach, now, lost: a.age > 6 });
+      }
     },
     get online() { return online; },
     stop: () => post('/mp/host/stop', {}).catch(() => {}),
@@ -182,34 +273,49 @@ export function createHost({ state, makeTeam, onPlayers, applyInput }) {
 
 // ------------------------------------------------------------ joueur
 /**
- * Poste joueur : son intervenant suit l'état publié par l'hôte ;
- * les clics deviennent des ordres envoyés à l'hôte.
+ * Poste joueur : son intervenant et le terrain suivent l'état publié par
+ * l'hôte ; clics et gestes deviennent des ordres envoyés à l'hôte.
  */
-export function createPlayer({ pid, state, team, onState, onLost }) {
+export function createPlayer({ pid, state, team, onState, onLost, onVictims, onResult }) {
   let others = [];
   let me = null;
   const queue = [];
-  let timer = null, lastOk = performance.now(), lost = false, hostOnline = true, gen = null;
+  const codec = makeCodec(state);
+  const shown = new Set();
+  let timer = null, lastOk = performance.now(), lost = false, hostOnline = true, gen = null, vrev = 0, rid = 0;
 
   async function sync() {
     const inputs = queue.splice(0, queue.length);
     try {
-      const r = await post('/mp/play', { pid, inputs });
+      const r = await post('/mp/play', { pid, inputs, vrev });
       lastOk = performance.now();
       if (lost) { lost = false; onLost?.(false); }
       hostOnline = r.hostOnline !== false;
       if (gen == null) gen = r.gen;
+      if (r.victims && Object.keys(r.victims).length) {
+        for (const [id, d] of Object.entries(r.victims)) {
+          const v = state.byId.get(id);
+          if (v) applyVictimState(v, d, codec);
+        }
+        onVictims?.();
+      }
+      vrev = r.vrev ?? vrev;
       const s = r.snapshot;
       if (s) {
         state.clock.elapsedMs = s.t;
         state.mpRunning = s.running;
-        others = s.avatars.filter((a) => a.pid !== pid);
-        me = s.avatars.find((a) => a.pid === pid) ?? null;
+        others = (s.avatars ?? []).filter((a) => a.pid !== pid);
+        me = (s.avatars ?? []).find((a) => a.pid === pid) ?? null;
         if (me) {
           team.team.walkedM = me.m;
           me.target = me.tx != null ? { x: me.tx, y: me.ty, victim: me.vid ? state.byId.get(me.vid) ?? null : null } : null;
+          for (const [k, res] of me.res ?? []) {
+            if (shown.has(k)) continue;
+            shown.add(k);
+            onResult?.(k, res);
+          }
         }
-        onState?.(s, me, others, { hostOnline, gen: r.gen !== gen });
+        onState?.(s, me, others, { hostOnline, gen: r.gen !== gen, codec });
       }
     } catch (e) {
       queue.unshift(...inputs);
@@ -219,9 +325,10 @@ export function createPlayer({ pid, state, team, onState, onLost }) {
   }
 
   return {
+    codec,
     start() { if (!timer) sync(); },
-    send(msg) { queue.push(msg); },
-    /** rapproche en douceur le pion local de la position publiée par l'hôte */
+    /** envoie une action ; renvoie son n° (le résultat revient par onResult) */
+    send(msg) { const id = `${pid}-${++rid}`; queue.push({ ...msg, rid: id }); return id; },
     update(dtMs) {
       if (!me) return;
       const k = Math.min(1, dtMs / 120);

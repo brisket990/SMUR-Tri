@@ -408,5 +408,5 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
     if (k) setTriage(k);
   });
 
-  return { open, close, tick, updateImage, isOpen: () => current != null };
+  return { open, close, tick, updateImage, isOpen: () => current != null, current: () => current, toast: (res, key) => { showToast(res, key); refresh(); } };
 }

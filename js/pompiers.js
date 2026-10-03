@@ -54,6 +54,34 @@ export function createPompiers(state, scenario, plan, { playerTeam, onSignal, on
     const id = C.teams > 1 ? `${C.label} ${i + 1}` : C.label;
     const tm = { id, x, y, target: null, busyUntil: 0, busyFrom: 0, task: 'bilans', sector: '', seen: 0, cares: 0, signals: 0, bag: { ...C.bag } };
     teams.push(tm);
+    tm.setSector = (z) => {
+      tm.sector = z;
+      tm.doneNote = '';
+      if (tm.target && tm.sector && tm.target.zone !== tm.sector) tm.target = null;
+      tm.picker?.set(z);
+      logEvent(state, 'sp-sector', { team: id, sector: tm.sector || 'auto' });
+    };
+    // les pompiers donnent la moitié de certains articles (au sac indiqué)
+    tm.giveTo = (inv) => {
+      const got = {};
+      for (const k of C.giveItems) {
+        const q = Math.ceil((tm.bag[k] ?? 0) / 2);
+        if (!q) continue;
+        tm.bag[k] -= q;
+        inv[k] = (inv[k] ?? 0) + q;
+        got[k] = q;
+      }
+      state.inventoryEver ??= {};
+      Object.keys(got).forEach((k) => (state.inventoryEver[k] = true));
+      logEvent(state, 'sp-give', { team: tm.id, items: got });
+      tm.refreshGive?.();
+      return got;
+    };
+    tm.refreshGive = () => {
+      if (!tm.giveBtn) return;
+      tm.giveBtn.disabled = !C.giveItems.some((k) => tm.bag[k] > 0);
+      if (tm.giveBtn.disabled) tm.giveBtn.textContent = '📦 Sac des pompiers vide';
+    };
     if (host) {
       hostBlock.hidden = false;
       const li = document.createElement('li');
@@ -63,10 +91,8 @@ export function createPompiers(state, scenario, plan, { playerTeam, onSignal, on
       tm.picker = createOrderPicker({
         zones: scenario.zones ?? [], team: id,
         onPick: (z) => {
-          tm.sector = z;
-          tm.doneNote = '';
-          if (tm.target && tm.sector && tm.target.zone !== tm.sector) tm.target = null;
-          logEvent(state, 'sp-sector', { team: id, sector: tm.sector || 'auto' });
+          if (state.mpRoute) return state.mpRoute({ t: 'cmd', mod: 'sp', id, z });   // multijoueur : ordre transmis au formateur
+          tm.setSector(z);
         },
       });
       li.appendChild(tm.picker.el);
@@ -77,21 +103,11 @@ export function createPompiers(state, scenario, plan, { playerTeam, onSignal, on
       give.title = 'Les pompiers vous donnent la moitié de leurs garrots, pansements compressifs et couvertures (ils en auront moins pour leurs propres gestes)';
       give.textContent = '📦 Demander leur matériel';
       give.addEventListener('click', () => {
-        const got = {};
-        for (const k of C.giveItems) {
-          const q = Math.ceil((tm.bag[k] ?? 0) / 2);
-          if (!q) continue;
-          tm.bag[k] -= q;
-          state.inventory[k] = (state.inventory[k] ?? 0) + q;
-          got[k] = q;
-        }
-        state.inventoryEver ??= {};
-        Object.keys(got).forEach((k) => (state.inventoryEver[k] = true));
-        logEvent(state, 'sp-give', { team: tm.id, items: got });
+        if (state.mpRoute) return state.mpRoute({ t: 'cmd', mod: 'sp-give', id });
+        const got = tm.giveTo(state.inventory);
         onGive?.(tm, got);
-        give.disabled = !C.giveItems.some((k) => tm.bag[k] > 0);
-        if (give.disabled) give.textContent = '📦 Sac des pompiers vide';
       });
+      tm.giveBtn = give;
       li.appendChild(give);
       tm.el = li.querySelector('.smur-task');
       host.prepend(li);

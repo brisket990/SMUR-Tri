@@ -293,13 +293,13 @@ export function showMenu(scenarios) {
     if (mode !== 'multi' || menu.hidden) return;
     // joueur inscrit : se signaler à chaque tour (sinon il serait retiré de l'équipe au lancement)
     const r = mpS.joined
-      ? await mpJoin().then((j) => ({ ...mpS.info, players: j.players, game: j.game, gen: j.gen })).catch(() => null)
+      ? await mpJoin().then((j) => ({ ...mpS.info, players: j.players, game: j.game, gen: j.gen, hostOnline: j.hostOnline })).catch(() => null)
       : await fetch('/mp/info', { cache: 'no-store' }).then((x) => x.json()).catch(() => null);
     if (r) {
       if (new URLSearchParams(location.search).has('joueur')) r.host = false;
       mpS.info = r;
       if (mpS.joined && r.game && !r.players.some((p) => p.pid === myPid())) mpS.joined = false;   // retiré par le formateur
-      if (mpS.joined && r.game) return mpLaunchPlayer(r);
+      if (mpS.joined && r.game && r.hostOnline !== false) return mpLaunchPlayer(r);
     }
     renderMp();
     mpS.poll = setTimeout(mpPoll, 1000);
@@ -311,6 +311,8 @@ export function showMenu(scenarios) {
       mpS.info = await probeServer();
       if (mode !== 'multi') return;
       card.dataset.mp = mpS.info ? (mpS.info.host ? 'host' : 'player') : 'none';
+      // écran du formateur revenu au menu : l'ancienne partie est close (les joueurs ne la rejoignent plus)
+      if (mpS.info?.host && mpS.info.game) { await post('/mp/host/stop', {}).catch(() => {}); mpS.info.game = null; }
     }
     renderMp();
     clearTimeout(mpS.poll);
@@ -376,7 +378,7 @@ export function showMenu(scenarios) {
             const r = await mpJoin();
             mpS.joined = true;
             store.set('smur.mp.role', mpRole.value);
-            if (r.game) return mpLaunchPlayer({ game: r.game, gen: r.gen });
+            if (r.game && r.hostOnline) return mpLaunchPlayer({ game: r.game, gen: r.gen });
           } catch (err) { startBtn.disabled = false; alert(`Impossible de rejoindre : ${err.message}`); return; }
           renderMp();
           return;

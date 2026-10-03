@@ -157,12 +157,24 @@ export function createDebrief(state, { history } = {}) {
         ${d.byOthers ? kpi(d.byOthers, 'gestes réalisés par les renforts et les pompiers') : ''}
         ${kpi(d.badCares.length, 'gestes non indiqués / excessifs', d.badCares.length ? 'bad' : '')}
       </div>
-
+      ${teamTable()}
       ${tools()}`;
     if (!document.getElementById('fb-search')) return;     // MPAP : aucune fiche regardée
     body.querySelectorAll('.fb-filters button').forEach((b) => b.addEventListener('click', () => { filter = b.dataset.f; renderList(); }));
     document.getElementById('fb-search').addEventListener('input', () => { if (filter === 'issues') filter = 'all'; renderList(); });
     renderList();
+  }
+
+  // multijoueur : ce qu'a fait chaque intervenant
+  function teamTable() {
+    const team = state.mpTeam?.();
+    if (!team?.length) return '';
+    const R = { med: 'Médecin', ide: 'Infirmier', amb: 'Ambulancier' };
+    const changes = state.victims.filter((v) => new Set(v.triageHistory.filter((h) => h.who).map((h) => h.who)).size > 1);
+    return `<h3 class="mp-db-title">Équipe</h3>
+      <table class="mp-db"><thead><tr><th>Intervenant</th><th>Fiches lues</th><th>Tris</th><th>Gestes</th><th>Matériel donné</th><th>Refus</th><th>Distance</th></tr></thead>
+      <tbody>${team.map((p) => `<tr><td><b>${esc(p.name)}</b> <span class="muted">${R[p.role] ?? ''}</span></td><td>${p.seen}</td><td>${p.triage}</td><td>${p.care}</td><td>${p.given}</td><td>${p.refused}</td><td>${p.m} m</td></tr>`).join('')}</tbody></table>
+      ${changes.length ? `<p class="muted small">Tris modifiés par un autre intervenant : ${changes.map((v) => `<b>${v.id}</b> (${v.triageHistory.filter((h) => h.who).map((h) => `${esc(h.who)} → ${h.category === 'RED' ? 'UA' : h.category === 'YELLOW' ? 'UR' : h.category === 'GREEN' ? 'impliqué' : 'UD'}`).join(', ')})`).join(' · ')}</p>` : ''}`;
   }
 
   // MPAP : pas de chrono ni de délais ; uniquement les fiches regardées
