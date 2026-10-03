@@ -391,7 +391,8 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
 
   function setTriage(cat) {
     if (!current) return;
-    onTriage(current.id, cat);
+    const r = onTriage(current.id, cat);
+    if (r && r.ok === false && r.message) showToast(r);
     refresh();
   }
 

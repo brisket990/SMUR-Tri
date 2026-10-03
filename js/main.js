@@ -33,6 +33,7 @@ import { createIntro } from './intro.js';
 import { primeCinematic, playCinematic, musicCtl } from './cinematique.js';
 import { createMusic } from './musique.js';
 import { setReal, realizeVictim } from './realmode.js';
+import { createHost, createPlayer, ROLES } from './multi.js';
 import { setupScrollHints } from './scrollhint.js';
 import { drawZoneLight } from './orders.js';
 import { selectVictims } from './selection.js';
@@ -92,6 +93,11 @@ async function boot() {
   const MPAP = !!scenario.mpapOf;
   const REAL = !!choice.real;            // mode réel : fiches sans constantes chiffrées
   setReal(REAL);
+  // multijoueur : l'hôte (PC formateur) fait tourner la simulation, les joueurs la suivent
+  const MP = choice.mp ?? null;
+  const HOST = MP?.role === 'host';
+  const PLAYER = MP?.role === 'player';
+  if (MP) CONFIG.clock.pauseOnModal = false;   // le temps ne s'arrête pour personne
 
   // 3. Le code déverrouille la clé des fichiers ; sans elle, rien n'est lisible
   let access = null;
@@ -250,6 +256,7 @@ async function boot() {
   $('hud-seed').title = 'Saisir ce numéro dans le menu (« N° de partie ») pour rejouer exactement cette partie';
 
   // 9. Affichage + interactions
+  if (HOST) CONFIG.flashlight.darkness = Math.min(CONFIG.flashlight.darkness, 0.25);   // formateur : tout le terrain visible
   if (MPAP) {
     // scène projetée : moins de pénombre, pas de tableau de bord chiffré
     CONFIG.flashlight.darkness = Math.min(CONFIG.flashlight.darkness, scenario.mpap?.darkness ?? 0.3);
@@ -271,6 +278,9 @@ async function boot() {
     onSupply: (tm) => amb?.say({ x: evac.pma.x, y: evac.pma.y, h: 40 }, `${tm.id} : matériel déposé (${Object.values(tm.items).reduce((a, q) => a + q, 0)} articles)`, 'alert', 6000),
   });
   state.team = team.team;
+  if (PLAYER) { team.team.color = ROLES[MP.myRole]?.color; team.team.label = ROLES[MP.myRole]?.short ?? 'SMUR'; }
+  let mpHost = null, mpPlayer = null, mpPending = null;
+  const mpRefuse = () => ({ ok: false, kind: 'impossible', message: 'Multijoueur (étape 1) : déplacements et lecture des fiches seulement. Tri et gestes partagés : étape suivante.' });
   state.evacSummary = evac.summary;
   const rescuers = createRescuers(state, scenario, {
     onAlert: (v) => amb?.alert(v, 'Docteur ! Elle s\'aggrave !'),
@@ -312,6 +322,7 @@ async function boot() {
     evac,
     rescuers,
     onRescuer: (id, what) => {
+      if (MP) return mpRefuse();
       const v = state.byId.get(id);
       const res = what === 'free' ? rescuers.release(v) : rescuers.post(v);
       hud.update(state);
@@ -319,12 +330,14 @@ async function boot() {
     },
     onEvac: (id, mode) => {
       const v = state.byId.get(id);
+      if (MP) return mpRefuse();
       const res = mode === 'walk' ? evac.walk(v) : mode === 'cancel' ? evac.cancel(v) : mode === 'priority' ? evac.prioritize(v) : mode === 'pma' ? evac.sendToPMA(v) : evac.requestStretcher(v);
       hud.update(state);
       return res;
     },
-    onTriage: (id, cat) => assignTriage(state, id, cat, judgeTriage, expectedTriage),
+    onTriage: (id, cat) => (MP ? mpRefuse() : assignTriage(state, id, cat, judgeTriage, expectedTriage)),
     onCare: (id, action) => {
+      if (MP) return mpRefuse();
       const res = applyCare(state, state.byId.get(id), action);
       hud.update(state);
       return res;
@@ -362,7 +375,7 @@ async function boot() {
       }
     },
     onClick: (sx, sy) => {
-      if (state.over || (!state.clock.running && !MPAP)) return;
+      if (state.over || (!(PLAYER ? state.mpRunning : state.clock.running) && !MPAP && !HOST)) return;
       const [wx, wy] = camera.screenToWorld(sx, sy);
       if (state.ui.debugZones) {
         const txt = `[${(wx / plan.w).toFixed(3)}, ${(wy / plan.h).toFixed(3)}]`;
@@ -373,6 +386,14 @@ async function boot() {
       const v = pickVictim(state, wx, wy);
       // périmètre : on n'examine que les victimes à portée ; sinon l'équipe s'y rend
       if (MPAP) { if (v) examine(v); return; }      // MPAP : pas de déplacement
+      if (HOST) { if (v) examine(v); return; }       // formateur : observe tout, sans se déplacer
+      if (PLAYER) {
+        if (v && team.inReach(v)) { examine(v); return; }
+        mpPending = v ?? null;
+        mpPlayer.send(v ? { t: 'goto', x: v.x, y: v.y, vid: v.id } : { t: 'goto', x: wx, y: wy });
+        team.team.target = { x: wx, y: wy, victim: v ?? null };
+        return;
+      }
       if (!v) { team.goTo(wx, wy); return; }
       if (team.inReach(v)) examine(v);
       else team.goTo(v.x, v.y, v);
@@ -395,6 +416,7 @@ async function boot() {
   }
   function examine(v) {
     team.stop();
+    if (PLAYER) { mpPending = null; mpPlayer.send({ t: 'stop' }); }
     if (!authorized && v.seenAt == null && !v.decoy && decoyUsed < decoyMax && leurres.length && cardOpts) makeDecoy(v);
     const firstLook = (v.seenAt == null && !!v.back) || (!authorized && !v.decoy) || (v.decoy && v.seenAt == null);
     markSeen(state, v.id);
@@ -403,7 +425,48 @@ async function boot() {
   }
   team.onArrive = (v) => { if (!modal.isOpen() && !state.over) examine(v); };
 
-  if (authorized) window.sim = { state, camera, modal, debrief, team, evac, rescuers, smur, pompiers, examine }; // accès console (formateur / tests)
+  // ---------- multijoueur ----------
+  if (HOST || PLAYER) {
+    const panel = document.createElement('div');
+    panel.className = 'mp-hud';
+    document.body.appendChild(panel);
+    const banner = document.createElement('div');
+    banner.className = 'mp-banner'; banner.hidden = true;
+    document.body.appendChild(banner);
+    const escH = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const row = (a, me) => {
+      const r = ROLES[a.role] ?? ROLES.med;
+      return `<li><span class="mp-badge" style="background:${r.color}">${r.short}</span><b>${escH(a.name || r.label)}</b>${me ? ' <span class="muted">(vous)</span>' : ''}${a.lost ? ' <span class="mp-lost">déconnecté</span>' : ''}<span class="mp-m">${a.m ?? 0} m</span></li>`;
+    };
+    if (HOST) {
+      mpHost = createHost({
+        state,
+        makeTeam: () => createTeam(state, scenario, plan),
+        onPlayers: (list) => {
+          panel.innerHTML = `<h4>Équipe sur le terrain (${list.length})</h4><ul class="mp-list">${list.map((a) => row({ ...a, lost: a.age > 6, m: Math.round(a.t.team.walkedM) })).join('') || '<li class="muted">Aucun joueur</li>'}</ul>`;
+          banner.hidden = mpHost.online;
+          banner.textContent = 'Serveur injoignable : la fenêtre du serveur est-elle encore ouverte ?';
+        },
+      });
+      mpHost.start();
+      addEventListener('pagehide', () => navigator.sendBeacon?.('/mp/host/stop', '{}'));
+    } else {
+      mpPlayer = createPlayer({
+        pid: MP.pid, state, team,
+        onState: (s, me, others, info) => {
+          if (mpPending && team.inReach(mpPending) && !modal.isOpen()) examine(mpPending);
+          panel.innerHTML = `<h4>Votre équipe</h4><ul class="mp-list">${me ? row(me, true) : ''}${others.map((a) => row(a)).join('')}</ul>`;
+          if (!info.hostOnline) { banner.hidden = false; banner.textContent = 'Écran du formateur fermé : la partie est en attente.'; }
+          else if (info.gen) { banner.hidden = false; banner.textContent = 'Le formateur a lancé une nouvelle partie : revenez au menu (Menu → Multi).'; }
+          else banner.hidden = true;
+        },
+        onLost: (l) => { banner.hidden = !l; banner.textContent = 'Connexion au serveur perdue… reconnexion en cours'; },
+      });
+      mpPlayer.start();
+    }
+  }
+
+  if (authorized) window.sim = { state, camera, modal, debrief, team, evac, rescuers, smur, pompiers, examine, get mpHost() { return mpHost; }, get mpPlayer() { return mpPlayer; } }; // accès console (formateur / tests)
   else $('hud-debrief').hidden = true;
 
   // Retour au menu (tous modes), avec confirmation
@@ -469,7 +532,9 @@ async function boot() {
   });
   if (authorized) window.sim.intro = intro;
   renderer.addOverlay((ctx) => intro.draw(ctx));
-  if (!MPAP) renderer.addOverlay((ctx) => team.draw(ctx, camera, performance.now()));
+  if (!MPAP && !HOST) renderer.addOverlay((ctx) => team.draw(ctx, camera, performance.now()));
+  if (HOST) renderer.addOverlay((ctx) => mpHost.draw(ctx, camera, performance.now()));
+  if (PLAYER) renderer.addOverlay((ctx) => mpPlayer.draw(ctx, camera, performance.now()));
   renderer.addOverlay((ctx) => amb.draw(ctx));
   addEventListener('keydown', (e) => {
     if ((e.key === 'm' || e.key === 'M') && !e.target.closest?.('input')) { sound.setMuted(!sound.muted); music.setMuted(sound.muted); }
@@ -484,11 +549,16 @@ async function boot() {
     last = now;
     updateSim(state, dt);
     if (state.over && music.playing) music.stop(4);   // fin de partie : fondu de sortie
-    if (state.clock.running) team.update(dt * CONFIG.clock.timeScale);
-    evac.update();
-    if (state.clock.running) rescuers.update();
-    smur.update(dt * CONFIG.clock.timeScale);
-    pompiers.update(dt * CONFIG.clock.timeScale);
+    if (PLAYER) {
+      mpPlayer.update(dt);                       // l'état vient de l'écran du formateur
+    } else {
+      if (state.clock.running && !HOST) team.update(dt * CONFIG.clock.timeScale);
+      if (HOST) mpHost.update(dt * CONFIG.clock.timeScale);
+      evac.update();
+      if (state.clock.running) rescuers.update();
+      smur.update(dt * CONFIG.clock.timeScale);
+      pompiers.update(dt * CONFIG.clock.timeScale);
+    }
     intro.update(dt);
     amb.update(dt);
     outside?.update();
@@ -546,9 +616,9 @@ async function boot() {
       if (choice.ambience.music && !MPAP) music.unlock();
     },
   });
-  state.clock.running = !MPAP;             // MPAP : le temps ne passe pas (pas d'aggravation)
-  logEvent(state, 'start', { scenario: scenario.id, real: REAL });
-  if (!MPAP) intro.start();
+  state.clock.running = !MPAP && !PLAYER;  // MPAP : le temps ne passe pas ; joueur réseau : temps de l'hôte
+  logEvent(state, 'start', { scenario: scenario.id, real: REAL, mp: MP?.role ?? null });
+  if (!MPAP && !PLAYER) intro.start();
   // musique d'ambiance : après le fondu de la musique de la vidéo
   if (choice.ambience.music && !MPAP) setTimeout(() => { if (!state.over) music.start(scenario.dataId ?? scenario.id, 6); }, 1200);
 }

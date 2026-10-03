@@ -495,18 +495,22 @@ body.mpap #evac-priority, body.mpap #evac-cancel, body.mpap .care-col h3.resc-ti
 
 /* ---------- Menu : onglets Jeu / MPAP ---------- */
 .menu-card { --accent: var(--red); --accent-soft: rgba(214, 50, 47, .16); transition: border-color .35s; position: relative; }
+.menu-card[data-mode="multi"] { --accent: #22b07d; --accent-soft: rgba(34, 176, 125, .16); border-color: #17503b; }
 .menu-card[data-mode="mpap"] { --accent: #3f8cff; --accent-soft: rgba(63, 140, 255, .16); border-color: #1f3a66; }
 .menu-start { background: var(--accent); transition: background .35s, transform .1s; }
 .menu-start:active { transform: scale(.98); }
 .menu-range input { accent-color: var(--accent); }
-.mode-switch { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 5px; border-radius: 14px;
+.mode-switch { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 0; padding: 5px; border-radius: 14px;
   background: #0b0d12; border: 1px solid var(--line); box-shadow: inset 0 2px 10px rgba(0,0,0,.5); isolation: isolate; }
 .mode-switch[hidden] { display: none; }
-.mode-glider { position: absolute; z-index: -1; top: 5px; bottom: 5px; left: 5px; width: calc(50% - 5px); border-radius: 10px;
+.mode-glider { position: absolute; z-index: -1; top: 5px; bottom: 5px; left: 5px; width: calc((100% - 10px) / var(--tabs, 3)); border-radius: 10px;
   background: linear-gradient(135deg, var(--accent-soft), rgba(255,255,255,.03)), #151924;
   border: 1px solid var(--accent); box-shadow: 0 0 22px var(--accent-soft), inset 0 1px 0 rgba(255,255,255,.07);
   transition: transform .38s cubic-bezier(.5, 1.6, .4, 1), border-color .35s, box-shadow .35s; }
 .menu-card[data-mode="mpap"] .mode-glider { transform: translateX(100%); }
+.menu-card[data-mode="multi"] .mode-glider { transform: translateX(calc(100% * (var(--tabs, 3) - 1))); }
+.mode-switch:has(.mode-tab[data-mode="mpap"][hidden]) { --tabs: 2; }
+.mode-tab[hidden] { display: none; }
 .mode-tab { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: none; border: 0; border-radius: 10px;
   color: var(--muted); text-align: left; cursor: pointer; transition: color .25s; }
 .mode-tab:hover { color: var(--text); }
@@ -775,3 +779,36 @@ body.editor-open { overflow: hidden; }
 .ed-real summary { cursor: pointer; font-weight: 600; }
 .ed-real summary em { color: var(--muted); font-weight: 400; font-style: normal; font-size: 12px; margin-left: 6px; }
 .ed-real textarea::placeholder { color: #6b7385; }
+
+/* ---------- Menu : onglet Multijoueur ---------- */
+.mp-panel[hidden] { display: none; }
+.mp-box { border: 1px solid #1f4d3c; background: rgba(34, 176, 125, .06); border-radius: 10px; padding: 12px 14px; font-size: 14px; line-height: 1.45; }
+.mp-box h3 { margin: 0 0 6px; font-size: 15px; }
+.mp-box h4 { margin: 10px 0 4px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.mp-box p { margin: 0 0 6px; }
+.mp-status { color: #3ddc97; font-weight: 700; margin-bottom: 6px; }
+.mp-addr { color: #fff; font-family: ui-monospace, Consolas, monospace; background: #0b0d12; padding: 1px 6px; border-radius: 5px; user-select: all; }
+.mp-row { display: flex; gap: 8px; margin: 6px 0; }
+.mp-row input { flex: 1; }
+.mp-row button { background: var(--accent); color: #fff; border: 0; font-weight: 700; }
+.mp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.mp-list li { display: flex; align-items: center; gap: 8px; }
+.mp-badge { font: 800 10px system-ui, sans-serif; color: #fff; padding: 2px 6px; border-radius: 999px; }
+.mp-ip { margin-left: auto; color: var(--muted); font-size: 12px; font-family: ui-monospace, Consolas, monospace; }
+.mp-lost { color: #ff8a8a; font-size: 12px; }
+.mp-only-player { display: none; }
+.menu-card[data-mode="multi"][data-mp="player"] .mp-only-player { display: grid; }
+.menu-card[data-mode="multi"]:is([data-mp="player"], [data-mp="none"], [data-mp="probing"]) :is(.f-scen, #menu-count-wrap, .menu-real, #menu-stock),
+.menu-card[data-mode="multi"] .f-game,
+.menu-card[data-mode="multi"]:is([data-mp="none"], [data-mp="probing"]) :is(#menu-code-wrap, .menu-start) { display: none !important; }
+.menu-start:disabled { opacity: .55; cursor: default; }
+
+/* ---------- Multijoueur en jeu ---------- */
+.mp-hud { position: fixed; left: 14px; bottom: 14px; z-index: 12; min-width: 230px; max-width: 320px; background: rgba(11, 13, 18, .92);
+  border: 1px solid #1f4d3c; border-radius: 10px; padding: 10px 12px; font-size: 13px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.mp-hud h4 { margin: 0 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #3ddc97; }
+.mp-hud .mp-list li { font-size: 13px; }
+.mp-hud .mp-m { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mp-banner { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 60; background: #5a1414; color: #fff; padding: 8px 16px;
+  border-radius: 999px; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.mp-banner[hidden] { display: none; }

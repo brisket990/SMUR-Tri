@@ -87,7 +87,7 @@ export function createTeam(state, scenario, plan) {
 
     // pion
     ctx.save();
-    ctx.fillStyle = '#0b3d91';
+    ctx.fillStyle = team.color ?? '#0b3d91';
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(sx, sy, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();

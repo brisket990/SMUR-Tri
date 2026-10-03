@@ -180,15 +180,24 @@
             <svg class="mode-ico" viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="7" width="40" height="26" rx="3" /><path d="M24 33v7M14 42h20" /><path d="M12 26l7-8 6 5 9-10" /></svg>
             <span class="mode-txt"><b>MPAP</b><small>Projection · en groupe</small></span>
           </button>
+          <button type="button" role="tab" class="mode-tab" data-mode="multi" aria-selected="false">
+            <svg class="mode-ico" viewBox="0 0 48 48" aria-hidden="true"><circle cx="15" cy="16" r="6" /><circle cx="33" cy="16" r="6" /><circle cx="24" cy="26" r="6" /><path d="M5 40c1-6 5-9 10-9M43 40c-1-6-5-9-10-9M14 44c1-6 5-9 10-9s9 3 10 9" /></svg>
+            <span class="mode-txt"><b>Multi</b><small>Réseau · en équipe</small></span>
+          </button>
         </div>
+        <!-- Multijoueur : contenu selon le poste (serveur, joueur, hors serveur) -->
+        <div id="mp-panel" class="mp-panel" hidden></div>
         <label>Nom / équipe
           <input id="menu-name" maxlength="40" placeholder="ex. Équipe SMUR 1" />
+        </label>
+        <label id="mp-role-wrap" class="mp-only-player">Votre rôle dans l'équipe
+          <select id="mp-role"><option value="med">Médecin</option><option value="ide">Infirmier</option><option value="amb">Ambulancier</option></select>
         </label>
         <!-- Champ caché : révélé par 3 clics rapides sur la carte (voir menu.js) -->
         <label id="menu-code-wrap" class="menu-code" hidden>Code
           <input id="menu-code" type="password" />
         </label>
-        <label>Scénario
+        <label class="f-scen">Scénario
           <select id="menu-scenario"></select>
           <span id="menu-scenario-desc" class="menu-desc"></span>
         </label>
@@ -196,7 +205,7 @@
           <input id="menu-count" type="range" />
         </label>
         <label class="sw menu-real"><input type="checkbox" id="menu-real" /><span class="sw-track"></span><span>Mode réel<small>Pas de scope à l'arrivée : ni tension, ni saturation, ni pouls chiffré. Les fiches ne montrent que ce qui se constate à mains nues : respiration comptée, pouls au toucher (frappé, filant, absent), TRC, couleur de la peau, état de conscience. Les vraies constantes sont données au bilan.</small></span></label>
-        <label class="menu-game">N° de partie <span class="muted">(facultatif, pour rejouer une partie)</span>
+        <label class="menu-game f-game">N° de partie <span class="muted">(facultatif, pour rejouer une partie)</span>
           <input id="menu-game" inputmode="numeric" placeholder="ex. BAT-138975-40 · vide = nouvelle partie au hasard" />
         </label>
         <div id="menu-stock" class="muted small"></div>
