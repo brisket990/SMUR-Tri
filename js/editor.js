@@ -12,6 +12,7 @@ import { unlock, openJSON } from './secure.js';
 import { generatedCardURL, templateFor } from './cardgen.js';
 import { loadPublished, loadDraft, saveDraft, dropDraft, sealForPublish, emptyCorrections } from './corrections.js';
 import { loadGH, saveGH, forgetGH, checkGH, putFile, guessRepo } from './github.js';
+import { realClinical, realParams } from './realmode.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const clone = (o) => JSON.parse(JSON.stringify(o ?? null));
@@ -352,7 +353,12 @@ async function start(list, access) {
         ${field('C — Circulation et choc', txt('clinical.circ', c.circ))}
         ${field('D — Neurologie', txt('clinical.neuro', c.neuro))}
         ${field('E — Bilan lésionnel', txt('clinical.lesion', c.lesion))}
-        <p class="ed-hint">Le texte s'affiche tel quel sur la fiche : vérifiez dans l'aperçu qu'il tient dans son cadre.</p>`;
+        <p class="ed-hint">Le texte s'affiche tel quel sur la fiche : vérifiez dans l'aperçu qu'il tient dans son cadre.</p>
+        <details class="ed-real" ${c.real && Object.values(c.real).some((x) => x?.trim()) ? 'open' : ''}>
+          <summary>Mode réel (sans constantes chiffrées) <em>facultatif</em></summary>
+          <p class="ed-hint">Laissé vide = conversion automatique (affichée en gris). Écrivez ici seulement si la conversion ne convient pas pour cette fiche.</p>
+          ${(() => { const auto = realClinical({ ...c, real: {} }); return ['vent', 'circ', 'neuro'].map((k) => field({ vent: 'A & B — Ventilation', circ: 'C — Circulation', neuro: 'D — Neurologie' }[k], `<textarea data-real="${k}" rows="2" placeholder="${esc(auto[k])}">${esc(c.real?.[k] ?? '')}</textarea>`)).join(''); })()}
+        </details>`;
     } else if (tab === 'tri') {
       f.innerHTML = `
         ${field('Tri attendu (état de la fiche imprimée)', triSeg('truth.triage', t.triage))}
@@ -442,6 +448,7 @@ async function start(list, access) {
             </div>
             ${field('Ce qui se passe', `<textarea data-st="text" rows="2">${esc(s.text)}</textarea>`)}
             ${field('Paramètres', `<input data-st="params" value="${esc(s.params ?? '')}" placeholder="FR · SpO2 · FC · PA · GCS" />`)}
+            ${field('Paramètres en mode réel', `<input data-st="paramsReal" value="${esc(s.paramsReal ?? '')}" placeholder="${esc(realParams(s.params ?? '', cur.clinical) || 'automatique')}" />`, 'vide = automatique')}
           </div>
           <button type="button" class="ed-del" data-del-st title="Supprimer l'étape">🗑</button>
         </li>`).join('')}
@@ -547,6 +554,14 @@ async function start(list, access) {
 
   // saisie générique (data-p="clinical.pres", etc.) et boutons à choix (data-seg)
   $('.ed-form').addEventListener('input', (e) => {
+    const r = e.target.closest('[data-real]');
+    if (r) {
+      const real = { ...(cur.clinical.real ?? {}), [r.dataset.real]: r.value };
+      for (const k of Object.keys(real)) if (!real[k]?.trim()) delete real[k];
+      if (Object.keys(real).length) cur.clinical.real = real; else delete cur.clinical.real;
+      commit();
+      return;
+    }
     const el = e.target.closest('[data-p]');
     if (!el) return;
     const [grp, k] = el.dataset.p.split('.');

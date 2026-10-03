@@ -165,6 +165,11 @@ export function showMenu(scenarios) {
     }
   });
 
+  // ---------- mode réel (sans constantes chiffrées) ----------
+  const real = $('menu-real');
+  real.checked = store.get('smur.real') === '1';
+  real.addEventListener('change', () => store.set('smur.real', real.checked ? '1' : '0'));
+
   // ---------- options d'ambiance (mémorisées) ----------
   const opts = {};
   for (const k of ['bubbles', 'phones', 'sound', 'outside', 'cine', 'music']) {
@@ -236,6 +241,7 @@ export function showMenu(scenarios) {
         scenarioId: sc?.id ?? null,           // null = hasard total
         count: sc ? Number(range.value) : null,
         seed: g?.seed ?? null,
+        real: real.checked,
         ambience: {
           bubbles: opts.bubbles.checked,
           phones: opts.phones.checked,

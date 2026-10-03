@@ -32,6 +32,7 @@ import { createPompiers } from './pompiers.js';
 import { createIntro } from './intro.js';
 import { primeCinematic, playCinematic, musicCtl } from './cinematique.js';
 import { createMusic } from './musique.js';
+import { setReal, realizeVictim } from './realmode.js';
 import { setupScrollHints } from './scrollhint.js';
 import { drawZoneLight } from './orders.js';
 import { selectVictims } from './selection.js';
@@ -89,6 +90,8 @@ async function boot() {
   }
   const zones = scenario.zones;
   const MPAP = !!scenario.mpapOf;
+  const REAL = !!choice.real;            // mode réel : fiches sans constantes chiffrées
+  setReal(REAL);
 
   // 3. Le code déverrouille la clé des fichiers ; sans elle, rien n'est lisible
   let access = null;
@@ -164,7 +167,7 @@ async function boot() {
       try { templates[n] = await asDataURL(`${tplDir}modele-${n}.jpg`); } catch { console.warn(`Modèle de fiche absent : modele-${n}.jpg`); }
       try { dosImages[n] = await asDataURL(`${tplDir}dos-${n}.png`); } catch { /* vue de dos : silhouette absente */ }
     }));
-    cardOpts = { title: scenario.cards?.title ?? CONFIG.cards?.title, templates, dosImages, labels: CONFIG.items };
+    cardOpts = { title: scenario.cards?.title ?? CONFIG.cards?.title, templates, dosImages, labels: CONFIG.items, real: REAL };
   }
   if (!authorized) {
     // sans code : 2 ou 3 fiches LEURRES jouables (inventées, publiques), puis la menace
@@ -175,7 +178,8 @@ async function boot() {
     const thumb = backThumb ?? makeThumb(threatCard(), CONFIG.thumbWidth);
     visuals = entries.map(() => ({ src: threatSrc, thumb }));
   } else {
-    const mode = scenario.cards?.mode ?? CONFIG.cards?.mode ?? 'generated';
+    // mode réel : toujours des fiches générées (les PNG portent les chiffres imprimés)
+    const mode = REAL ? 'generated' : scenario.cards?.mode ?? CONFIG.cards?.mode ?? 'generated';
     const generate = async (e) => {
       const src = generatedCardURL(e, cardOpts);
       return { src, thumb: makeThumb(await loadImage(src), CONFIG.thumbWidth), generated: true };
@@ -223,6 +227,7 @@ async function boot() {
     const profile = profiles[e.profile] ?? { stages: [], actions: {} };
     if (authorized && !profiles[e.profile]) console.warn(`${e.id} : profil "${e.profile}" inconnu`);
     initEvolution(v, profile, e.actions);
+    realizeVictim(v);
     return v;
   });
   // les cartes "devant" sont dessinées en dernier ; une carte cachée est dessinée juste avant son couvercle
@@ -232,6 +237,7 @@ async function boot() {
   const state = createGameState({ plan, zones, victims, stock, player });
   state.clock.running = false;           // démarre à l'engagement (fin du briefing)
   state.mpap = MPAP;
+  state.real = REAL;
   if (MPAP) for (const k of Object.keys(state.inventory)) state.inventory[k] = Infinity;   // matériel illimité
   state.seed = seed;
   state.count = entries.length;
@@ -383,6 +389,7 @@ async function boot() {
     v.truth = { triage: null, accept: [], limit: false, why: '', note: '', ...d.truth };
     v.entry = { id: v.id, clinical: d.clinical, injuries: d.injuries };
     initEvolution(v, { stages: [], actions: {}, ...d.profile });
+    realizeVictim(v);
     v.cardView = 'face'; v.cardSig = '0||face';
     v.src = generatedCardURL(v.entry, cardOpts);
   }
@@ -540,7 +547,7 @@ async function boot() {
     },
   });
   state.clock.running = !MPAP;             // MPAP : le temps ne passe pas (pas d'aggravation)
-  logEvent(state, 'start', { scenario: scenario.id });
+  logEvent(state, 'start', { scenario: scenario.id, real: REAL });
   if (!MPAP) intro.start();
   // musique d'ambiance : après le fondu de la musique de la vidéo
   if (choice.ambience.music && !MPAP) setTimeout(() => { if (!state.over) music.start(scenario.dataId ?? scenario.id, 6); }, 1200);

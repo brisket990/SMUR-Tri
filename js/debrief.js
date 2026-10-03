@@ -125,7 +125,7 @@ export function createDebrief(state, { history } = {}) {
         </section>
         <section><h4>Évolution</h4>
           <p class="fb-out ${f.outcome.cls}">${esc(f.outcome.text)}</p>
-          ${c.mechanism ? `<p class="muted small">${esc(c.mechanism)} · ${esc(c.vent ?? '')} ${esc(c.circ ?? '')} ${esc(c.neuro ?? '')}</p>` : ''}
+          ${c.mechanism ? `<p class="muted small">${state.real ? '<b>Constantes réelles (masquées en mode réel) :</b> ' : `${esc(c.mechanism)} · `}${esc(c.vent ?? '')} ${esc(c.circ ?? '')} ${esc(c.neuro ?? '')}</p>` : ''}
         </section>
       </div>
     </details>`;
@@ -137,7 +137,7 @@ export function createDebrief(state, { history } = {}) {
     fb = analyzeAll(S);
     if (state.mpap) { filter = 'all'; body.innerHTML = mpapHead(d); }
     else body.innerHTML = `
-      <p class="muted">${state.player?.name ? `<b style="color:var(--text)">${esc(state.player.name)}</b> · ` : ''}${esc(state.scenario?.name ?? '')}${state.scenario?.random ? ' (hasard total)' : ''} · ${state.count ?? d.total} victimes · exercice arrêté à T+${formatTime(state.clock.elapsedMs)}</p>
+      <p class="muted">${state.player?.name ? `<b style="color:var(--text)">${esc(state.player.name)}</b> · ` : ''}${esc(state.scenario?.name ?? '')}${state.scenario?.random ? ' (hasard total)' : ''}${state.real ? ' · <span class="real-tag">mode réel</span>' : ''} · ${state.count ?? d.total} victimes · exercice arrêté à T+${formatTime(state.clock.elapsedMs)}</p>
       ${state.endReason ? `<p class="end-reason">✓ ${esc(state.endReason)}</p>` : ''}
       <p class="replay">Pour rejouer exactement cette partie (mêmes victimes, mêmes emplacements) : saisir <b>${state.gameNumber}</b> dans « N° de partie » du menu.</p>
       <div class="kpis">
@@ -169,7 +169,7 @@ export function createDebrief(state, { history } = {}) {
   function mpapHead(d) {
     const pma = d.pma;
     return `
-      <p class="muted">${esc(state.scenario?.name ?? '')} · <b style="color:var(--text)">${d.total} fiche${d.total > 1 ? 's' : ''} regardée${d.total > 1 ? 's' : ''}</b> sur ${state.victims.length} · le bilan ne porte que sur ces fiches</p>
+      <p class="muted">${esc(state.scenario?.name ?? '')}${state.real ? ' · <span class="real-tag">mode réel</span>' : ''} · <b style="color:var(--text)">${d.total} fiche${d.total > 1 ? 's' : ''} regardée${d.total > 1 ? 's' : ''}</b> sur ${state.victims.length} · le bilan ne porte que sur ces fiches</p>
       ${d.total ? `<div class="kpis">
         ${kpi(`${d.triaged}/${d.total}`, 'fiches triées')}
         ${kpi(d.exact + d.accepted, `tris justes (${d.accepted} défendables)`, 'good')}

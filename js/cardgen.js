@@ -1,3 +1,4 @@
+import { realClinical } from './realmode.js';
 // ============================================================
 //  Fiches générées : la carte est dessinée à partir du texte
 // ============================================================
@@ -386,7 +387,7 @@ function badges(care, position, labels, F) {
 }
 
 export function cardSVG(e, opts = {}) {
-  const c = e.clinical ?? {};
+  const c = (opts.real ? realClinical(e.clinical) : e.clinical) ?? {};
   const F = 'Arial, Helvetica, "Liberation Sans", sans-serif';
   const view = opts.view === 'dos' ? 'dos' : 'face';
   const all = e.injuries != null ? parseSpec(e.injuries) : autoSpec(c, e.id);

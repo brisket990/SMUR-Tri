@@ -232,7 +232,7 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
     const seen = v.evo.stages.slice(0, v.evo.seenStage);
     evoHistTitle.hidden = seen.length === 0;
     evoHist.innerHTML = seen
-      .map((s) => `<li><span class="t">${formatTime(s.atMs)}</span>${s.text}<br><span class="muted">${s.params}</span></li>`)
+      .map((s) => `<li><span class="t">${formatTime(s.atMs)}</span>${s.tShow ?? s.text}<br><span class="muted">${s.pShow ?? s.params}</span></li>`)
       .join('');
   }
 
@@ -258,12 +258,12 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
     esBody.innerHTML = `
       <div class="es-now ${dead ? 'dead' : ''}">
         <div class="es-t">${dead ? '✝ Décès constaté' : 'Maintenant'} · T+${formatTime(cur.atMs)}</div>
-        <div class="es-text">${cur.text}</div>
-        ${cur.params ? `<div class="es-params">${cur.params}</div>` : ''}
+        <div class="es-text">${cur.tShow ?? cur.text}</div>
+        ${cur.params ? `<div class="es-params">${cur.pShow ?? cur.params}</div>` : ''}
       </div>
       <ol class="es-steps">
         <li><span class="t">T+00:00</span>Fiche imprimée (état initial)</li>
-        ${seen.slice(0, -1).map((st) => `<li><span class="t">T+${formatTime(st.atMs)}</span>${st.text}${st.params ? `<br><span class="p">${st.params}</span>` : ''}</li>`).join('')}
+        ${seen.slice(0, -1).map((st) => `<li><span class="t">T+${formatTime(st.atMs)}</span>${st.tShow ?? st.text}${st.params ? `<br><span class="p">${st.pShow ?? st.params}</span>` : ''}</li>`).join('')}
         <li class="cur"><span class="t">T+${formatTime(cur.atMs)}</span>${dead ? 'Décès' : 'État actuel (ci-dessus)'}</li>
       </ol>`;
   }
@@ -283,8 +283,8 @@ export function createModal({ state, evac, onEvac, rescuers, onRescuer, onTriage
     const deadBanner = v.status === 'DEAD' ? '<div class="evo-dead">✝ Décès constaté</div>' : '';
     const more = fresh.length > 1
       ? `<p class="muted small">${fresh.length} aggravations depuis la dernière évaluation.</p>` : '';
-    $('evo-content').innerHTML = `${deadBanner}<p class="evo-text">${last.text}</p>`
-      + (last.params ? `<div class="evo-params">${last.params}</div>` : '') + more;
+    $('evo-content').innerHTML = `${deadBanner}<p class="evo-text">${last.tShow ?? last.text}</p>`
+      + (last.params ? `<div class="evo-params">${last.pShow ?? last.params}</div>` : '') + more;
     popup.hidden = false;
   }
 

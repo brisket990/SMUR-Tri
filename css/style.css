@@ -762,3 +762,16 @@ body.editor-open { overflow: hidden; }
 .vol input[type=range] { flex: 1; accent-color: var(--red); }
 .vol output { width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
 .vol.off { opacity: .4; }
+
+/* ---------- Mode réel ---------- */
+.menu-fields label.menu-real { display: flex; gap: 12px; font-weight: 400; }
+.menu-real > span:last-child { color: var(--text); font-weight: 700; font-size: 14px; }
+.menu-real small { font-weight: 400; color: var(--muted); font-size: 12px; }
+.menu-real { margin: -2px 0 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.02); align-items: flex-start; }
+.menu-real .sw-track { margin-top: 2px; flex: none; }
+.menu-real small { display: block; margin-top: 3px; line-height: 1.4; }
+.real-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #3a2a10; color: #ffcf6e; font-size: 12px; font-weight: 700; }
+.ed-real { margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; }
+.ed-real summary { cursor: pointer; font-weight: 600; }
+.ed-real summary em { color: var(--muted); font-weight: 400; font-style: normal; font-size: 12px; margin-left: 6px; }
+.ed-real textarea::placeholder { color: #6b7385; }
